@@ -1,0 +1,19 @@
+.drop-area{
+    background: #777777;
+    width: 25vw;
+    height: 15vw;
+    border-radius: 0.5rem;
+    border: 0.2rem solid #333333;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    font-weight: bold;
+    font-size: 1.3em;
+    font-family: sans-serif;
+}
+
+.drop-area-hover {
+    border: 0.2rem dashed #cccccc;
+    background: rgb(0, 111, 161);
+    color: #cccccc;
+}

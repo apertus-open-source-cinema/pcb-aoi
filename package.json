@@ -1,0 +1,43 @@
+{
+  "name": "pcb-aoi",
+  "version": "0.1.0",
+  "description": "apertus° PCB inspection",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "start": "node",
+    "debug": "nodemon --inspect"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/apertus-open-source-cinema/pcb-aoi.git"
+  },
+  "author": "apertus° contributors",
+  "license": "GPL-3.0",
+  "bugs": {
+    "url": "https://github.com/apertus-open-source-cinema/pcb-aoi/issues"
+  },
+  "homepage": "https://github.com/apertus-open-source-cinema/pcb-aoi#readme",
+  "devDependencies": {
+    "browser-sync": "^2.23.6",
+    "connect-livereload": "^0.6.0",
+    "eslint": "^4.19.1",
+    "eslint-config-standard": "^11.0.0",
+    "eslint-plugin-import": "^2.10.0",
+    "eslint-plugin-node": "^6.0.1",
+    "eslint-plugin-promise": "^3.7.0",
+    "eslint-plugin-standard": "^3.0.1",
+    "gulp-connect": "^5.5.0",
+    "gulp-livereload": "^3.8.1",
+    "gulp-nodemon": "^2.2.1",
+    "gulp-notify": "^3.2.0",
+    "nodemon": "^1.17.3"
+  },
+  "dependencies": {
+    "bson": "^2.0.4",
+    "express": "^4.16.3",
+    "gulp": "^3.9.1",
+    "path": "^0.12.7",
+    "ws": "^5.1.1"
+  }
+}
