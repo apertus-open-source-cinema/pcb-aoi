@@ -4,15 +4,25 @@
 <head>
     <title>full doc</title>
 
-    <link rel="stylesheet" type="text/css" href="css/default.css" >
-    
-    <script src="js/bson.js"></script>
-    <script src="js/main.js" ></script>
+    <link rel="stylesheet" type="text/css" href="css/default.css">
+
+    <!-- <script src="js/bson.js"></script> -->
+    <script src="/socket.io/socket.io.js"></script>
+    <script src="socket.io-file-client.js"></script>
+    <script src="js/main.js"></script>
 </head>
 
 <body>
-    <div id="drop-area" class="drop-area">
-        Drop images here
+    <div class="content">
+        <div id="drop-area" class="drop-area">
+            Drop images here
+        </div>
+        <div id="preview-area" class="output-area">
+            <img id="preview-content"></img>
+        </div>
+        <div id="output-area" class="output-area">
+            <img id="output-content"></img>
+        </div>
     </div>
 </body>
 

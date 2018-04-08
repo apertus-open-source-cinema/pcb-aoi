@@ -1,70 +1,55 @@
-const http = require('http')
-const app = require('express')()
-const WebSocket = require('ws')
+'use strict'
+const express = require('express')
+const app = express()
+var server = require('http').Server(app)
+var io = require('socket.io')(server)
 const path = require('path')
+const SocketIOFile = require('socket.io-file')
 var fs = require('fs')
-var BSON = require('bson')
 
 const httpPort = 8080
 
-const wss = new WebSocket.Server({port: 8081})
+server.listen(httpPort)
+
+app.use(express.static(path.join(__dirname, '/app')))
 
 app.get('/', (request, response) => {
   response.sendFile(path.join(__dirname, '/app/index.html'))
 })
 
-wss.on('connection', function connection (ws) {
-  ws.on('message', function incoming (message) {
-    // if (typeof message !== 'string') {
-    // `message` is either a `Buffer` or an `ArrayBuffer`.
-    console.log('received: %s', message)
-    var bson = new BSON()
-    //var data = bson.deserialize(message)
-    var messageData = bson.deserialize(message)
-    // console.log('received: %s', message.buffer.name)
-    // console.log('received: %s', message.fileData)
+app.get('/socket.io-file-client.js', (req, res, next) => {
+  return res.sendFile(path.join(__dirname, '/node_modules/socket.io-file-client/socket.io-file-client.js'))
+})
 
-    fs.writeFileSync('./tmp/' + messageData.fileName, Buffer.from(messageData.fileData))
-    // }
+io.on('connection', function (socket) {
+  console.log('a user connected: ' + socket)
+
+  socket.emit('news', { hello: 'world' })
+  socket.on('my other event', function (data) {
+    console.log(data)
   })
 
-  ws.send('something 123')
+  var uploader = new SocketIOFile(socket, {
+    uploadDir: 'tmp',
+    chunkSize: 102400,
+    transmissionDelay: 0,
+    overwrite: false
+  })
+
+  uploader.on('start', (fileInfo) => {
+    console.log('Start uploading')
+    console.log(fileInfo)
+  })
+
+  uploader.on('complete', (fileInfo) => {
+    fs.readFile(path.join(__dirname, fileInfo.uploadDir), function (err, buf) {
+      if (err) {
+        console.log('Error!', err)
+        return
+      }
+
+      console.log('Pushing image: ' + fileInfo.name)
+      socket.emit('image', { image: true, buffer: buf.toString('base64') })
+    })
+  })
 })
-
-// wss.on('message', function incoming (data) {
-//   console.log(data)
-//   wss.send('message received')
-// })
-
-process.on('uncaughtException', function (err) {
-  console.log(err)
-})
-
-app.listen(httpPort, (err) => {
-  if (err) {
-    return console.log('something bad happened', err)
-  }
-
-  console.log(`server is listening on ${httpPort}`)
-})
-
-// const requestHandler = (request, response) => {
-//     console.log(request.url)
-//     response.end('Hello Node.js Server!')
-// }
-
-// const server = http.createServer(requestHandler)
-
-// server.listen(httpPort, (err) => {
-//     if (err) {
-//         return console.log('something bad happened', err)
-//     }
-// })
-
-// http.createServer(function (request, response) {
-//     var filePath = '.' + request.url;
-//     if (filePath == './')
-//         filePath = './app/index.html';
-//     //res.writeHead(200, {'Content-Type': 'text/plain'});
-//     //res.end('Hello World!');
-// }).listen(httpPort);

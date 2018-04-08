@@ -1,47 +1,53 @@
+var socketio = io()
+var socket = socketio.connect('http://localhost:8080')
 
-var webSocket = new WebSocket('ws://localhost:8081')
-var bson = new BSON()
+function start () {
+  socket.on('news', function (data) {
+    console.log(data)
+    socketio.emit('my other event', { my: 'data' })
+  })
 
-// function start () {
-//   // Get the Long type
-//   var Long = BSON.Long
-//   // Create a bson parser instance
-//   var bson = new BSON()
+  socket.on('image', function (data) {
+    console.log(data)
+    var outputArea = document.getElementById('output-content')
+    outputArea.src = 'data:image/png;base64,' + data.buffer
 
-//   // Serialize document
-//   var doc = { long: Long.fromNumber(100) }
-
-//   // Serialize a document
-//   var data = bson.serialize(doc)
-//   bson.serialize("Test", "TestABC")
-//   // De serialize it again
-//   var doc_2 = bson.deserialize(data)
-// }
-
-webSocket.onopen = function () {
-  // webS<ocket.send('Test ABC 123')
+    // socketio.emit('my other event', { my: 'data' })
+  })
 }
 
-webSocket.onmessage = function (event) {
-  console.log(event.data)
-}
 function handleDrop (e) {
   console.log('Drop executed')
 
   // Stops default drop action, like loading file content.
   e.preventDefault()
-  if (e.stopPropagation) {
-    e.stopPropagation()
-  }
+  e.stopPropagation()
 
-  var data = {}
-  data.name = 'Test123'
-  data.test2 = 123 // e.target.files[0].name
-  data.fileName = e.dataTransfer.files[0].name
-  data.fileData = new Uint8Array(e.dataTransfer.files[0])
-  webSocket.binaryType = 'blob'
-  var serializedData = bson.serialize(data)
-  webSocket.send(serializedData)
+  console.log('File name: ' + e.dataTransfer.files[0].name)
+
+  var uploader = new SocketIOFileClient(socket)
+  uploader.on('start', function (fileInfo) {
+    console.log('Start uploading', fileInfo)
+  })
+  uploader.on('stream', function (fileInfo) {
+    console.log('Streaming... sent ' + fileInfo.sent + ' bytes.')
+  })
+  uploader.on('complete', function (fileInfo) {
+    console.log('Upload Complete', fileInfo)
+    e.dataTransfer.items.clear()
+  })
+  uploader.on('error', function (err) {
+    console.log('Error!', err)
+  })
+  uploader.on('abort', function (fileInfo) {
+    console.log('Aborted: ', fileInfo)
+  })
+  var files = e.dataTransfer.files
+  uploader.on('ready', function (fileInfo) {
+    uploader.upload(files)
+  })
+
+  document.getElementById('preview-content').src = window.URL.createObjectURL(e.dataTransfer.files[0])
 
   var dropArea = document.getElementById('drop-area')
   dropArea.classList.remove('drop-area-hover')
@@ -50,7 +56,7 @@ function handleDrop (e) {
 }
 
 window.onload = function () {
-//   start()
+  start()
 
   var dropArea = document.getElementById('drop-area')
   console.log(dropArea)
