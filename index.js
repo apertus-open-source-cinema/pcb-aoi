@@ -1,24 +1,24 @@
 'use strict'
 const express = require('express')
 const app = express()
-var server = require('http').Server(app)
-var io = require('socket.io')(server)
+const server = require('http').Server(app)
+const io = require('socket.io')(server)
 const path = require('path')
-const SocketIOFile = require('socket.io-file')
-var fs = require('fs')
+// const SocketIOFile = require('socket.io-file')
+// const fs = require('fs')
+const SocketIOFileUpload = require('socketio-file-upload')
+const sharp = require('sharp')
+const { execSync } = require('child_process')
 
 const httpPort = 8080
 
 server.listen(httpPort)
 
 app.use(express.static(path.join(__dirname, '/app')))
+app.use(SocketIOFileUpload.router)
 
 app.get('/', (request, response) => {
   response.sendFile(path.join(__dirname, '/app/index.html'))
-})
-
-app.get('/socket.io-file-client.js', (req, res, next) => {
-  return res.sendFile(path.join(__dirname, '/node_modules/socket.io-file-client/socket.io-file-client.js'))
 })
 
 io.on('connection', function (socket) {
@@ -29,27 +29,32 @@ io.on('connection', function (socket) {
     console.log(data)
   })
 
-  var uploader = new SocketIOFile(socket, {
-    uploadDir: 'tmp',
-    chunkSize: 102400,
-    transmissionDelay: 0,
-    overwrite: false
-  })
+  const uploader = new SocketIOFileUpload()
+  uploader.dir = path.join(__dirname, '/tmp')
+  uploader.listen(socket)
 
-  uploader.on('start', (fileInfo) => {
-    console.log('Start uploading')
-    console.log(fileInfo)
-  })
+  uploader.on('saved', function (event) {
+    console.log(event.file)
 
-  uploader.on('complete', (fileInfo) => {
-    fs.readFile(path.join(__dirname, fileInfo.uploadDir), function (err, buf) {
+    var cmd = 'python ./python/pcb_processing.py ' + event.file.pathName
+    execSync(cmd, (err, stdout, stderr) => {
       if (err) {
-        console.log('Error!', err)
+        // node couldn't execute the command
         return
       }
 
-      console.log('Pushing image: ' + fileInfo.name)
-      socket.emit('image', { image: true, buffer: buf.toString('base64') })
+      // the *entire* stdout and stderr (buffered)
+      console.log(`stdout: ${stdout}`)
+      console.log(`stderr: ${stderr}`)
     })
+
+    // Create thumbnail and push to the page
+    // TODO: Replace with something more meaningful
+    sharp('./tmp/warp.png')
+      .resize(200)
+      .toBuffer().then(function (buffer) {
+        var base64Buffer = buffer.toString('base64')
+        socket.emit('image', { image: true, buffer: base64Buffer })
+      })
   })
 })

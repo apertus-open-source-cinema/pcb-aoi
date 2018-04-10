@@ -1,51 +1,33 @@
 var socketio = io()
-var socket = socketio.connect('http://localhost:8080')
+var socket = socketio.connect(window.location.hostname + ':8080')
+const uploader = new SocketIOFileUpload(socket)
 
 function start () {
-  socket.on('news', function (data) {
-    console.log(data)
-    socketio.emit('my other event', { my: 'data' })
-  })
-
   socket.on('image', function (data) {
-    console.log(data)
     var outputArea = document.getElementById('output-content')
     outputArea.src = 'data:image/png;base64,' + data.buffer
 
     // socketio.emit('my other event', { my: 'data' })
   })
+
+  uploader.listenOnDrop(document.getElementById('drop-area'))
+
+  uploader.addEventListener('progress', function (event) {
+    var percent = event.bytesLoaded / event.file.size * 100
+    console.log('File is', percent.toFixed(2), 'percent loaded')
+  })
 }
 
 function handleDrop (e) {
-  console.log('Drop executed')
-
   // Stops default drop action, like loading file content.
   e.preventDefault()
   e.stopPropagation()
 
-  console.log('File name: ' + e.dataTransfer.files[0].name)
+  for (var index = 0; index < e.dataTransfer.files.length; index++) {
+    console.log('File: ' + e.dataTransfer.files[index].name)
+  }
 
-  var uploader = new SocketIOFileClient(socket)
-  uploader.on('start', function (fileInfo) {
-    console.log('Start uploading', fileInfo)
-  })
-  uploader.on('stream', function (fileInfo) {
-    console.log('Streaming... sent ' + fileInfo.sent + ' bytes.')
-  })
-  uploader.on('complete', function (fileInfo) {
-    console.log('Upload Complete', fileInfo)
-    e.dataTransfer.items.clear()
-  })
-  uploader.on('error', function (err) {
-    console.log('Error!', err)
-  })
-  uploader.on('abort', function (fileInfo) {
-    console.log('Aborted: ', fileInfo)
-  })
-  var files = e.dataTransfer.files
-  uploader.on('ready', function (fileInfo) {
-    uploader.upload(files)
-  })
+  console.log('File name: ' + e.dataTransfer.files[0].name)
 
   document.getElementById('preview-content').src = window.URL.createObjectURL(e.dataTransfer.files[0])
 
@@ -55,9 +37,7 @@ function handleDrop (e) {
   return false
 }
 
-window.onload = function () {
-  start()
-
+function setupFileDrop () {
   var dropArea = document.getElementById('drop-area')
   console.log(dropArea)
 
@@ -76,10 +56,11 @@ window.onload = function () {
     dropArea.classList.remove('drop-area-hover')
   })
 
-  //   dropArea.addEventListener('dragend', function (e) {
-  //     e.preventDefault()
-  //     dropArea.classList.remove('drop-area-hover')
-  //   })
-
   dropArea.addEventListener('drop', handleDrop)
+}
+
+window.onload = function () {
+  start()
+
+  setupFileDrop()
 }
