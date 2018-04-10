@@ -14,6 +14,7 @@ function start () {
 
   uploader.addEventListener('progress', function (event) {
     var percent = event.bytesLoaded / event.file.size * 100
+    document.getElementById('upload-progress').style.width = percent + '%'
     console.log('File is', percent.toFixed(2), 'percent loaded')
   })
 }

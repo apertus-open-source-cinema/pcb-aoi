@@ -10,6 +10,7 @@
     font-weight: bold;
     font-size: 1.3em;
     font-family: sans-serif;
+    box-sizing: border-box;
 }
 
 .drop-area-hover {
@@ -35,4 +36,23 @@
 .content {
     display: flex;
     padding: 1em;
+}
+
+.meter {
+    height: 0.5rem;
+    position: relative;
+    background: #555;
+    border-radius: 0.5rem;
+    margin-top: 0.3em;
+    /* padding: 0.2rem; */
+    padding: 0;
+}
+
+.meter>span {
+    display: block;
+    height: 100%;
+    border-radius: 0.5rem;
+    background-color:#FA8756;
+    position: relative;
+    overflow: hidden;
 }
