@@ -1,6 +1,6 @@
 {
   "name": "pcb-aoi",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "apertus° PCB inspection",
   "main": "index.js",
   "scripts": {
@@ -19,30 +19,30 @@
   },
   "homepage": "https://github.com/apertus-open-source-cinema/pcb-aoi#readme",
   "devDependencies": {
-    "browser-sync": "^2.23.6",
-    "connect-livereload": "^0.6.0",
+    "browser-sync": "^2.26.13",
+    "connect-livereload": "^0.6.1",
     "eslint": "^4.19.1",
     "eslint-config-standard": "^11.0.0",
-    "eslint-plugin-import": "^2.10.0",
+    "eslint-plugin-import": "^2.22.1",
     "eslint-plugin-node": "^6.0.1",
-    "eslint-plugin-promise": "^3.7.0",
-    "eslint-plugin-standard": "^3.0.1",
-    "gulp-connect": "^5.5.0",
+    "eslint-plugin-promise": "^3.8.0",
+    "eslint-plugin-standard": "^3.1.0",
+    "gulp-connect": "^5.7.0",
     "gulp-livereload": "^3.8.1",
-    "gulp-nodemon": "^2.2.1",
+    "gulp-nodemon": "^2.5.0",
     "gulp-notify": "^3.2.0",
-    "nodemon": "^1.17.3"
+    "nodemon": "^1.19.4"
   },
   "dependencies": {
-    "bson": "^2.0.4",
-    "express": "^4.16.3",
+    "bson": "^2.0.8",
+    "express": "^4.17.1",
     "gulp": "^3.9.1",
     "path": "^0.12.7",
-    "sharp": "^0.20.1",
-    "socket.io": "^2.1.0",
-    "socket.io-file": "^2.0.2",
+    "sharp": "^0.20.8",
+    "socket.io": "^2.4.1",
+    "socket.io-file": "^2.0.31",
     "socket.io-file-client": "^2.0.2",
-    "socketio-file-upload": "^0.6.0",
-    "ws": "^5.1.1"
+    "socketio-file-upload": "^0.6.4",
+    "ws": "^5.2.2"
   }
 }

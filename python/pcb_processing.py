@@ -106,4 +106,6 @@ def main():
 
     return outputFileName
 
-main()
+
+if __name__ == '__main__':
+    main()
