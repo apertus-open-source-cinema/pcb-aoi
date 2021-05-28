@@ -43,6 +43,6 @@
     "socket.io-file": "^2.0.31",
     "socket.io-file-client": "^2.0.2",
     "socketio-file-upload": "^0.6.4",
-    "ws": "^5.2.2"
+    "ws": "^7.4.5"
   }
 }
