@@ -35,7 +35,7 @@
   },
   "dependencies": {
     "bson": "^2.0.8",
-    "express": "^4.17.1",
+    "express": "^4.17.3",
     "gulp": "^3.9.1",
     "path": "^0.12.7",
     "sharp": "^0.20.8",
