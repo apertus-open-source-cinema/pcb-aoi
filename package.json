@@ -19,7 +19,7 @@
   },
   "homepage": "https://github.com/apertus-open-source-cinema/pcb-aoi#readme",
   "devDependencies": {
-    "browser-sync": "^2.26.13",
+    "browser-sync": "^2.27.10",
     "connect-livereload": "^0.6.1",
     "eslint": "^4.19.1",
     "eslint-config-standard": "^11.0.0",
