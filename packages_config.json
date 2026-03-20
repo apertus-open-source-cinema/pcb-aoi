@@ -1,0 +1,82 @@
+{
+  "0402-B": {
+    "width_mm": 1.0,
+    "length_mm": 0.5
+  },
+  "0603-B": {
+    "width_mm": 1.6,
+    "length_mm": 0.8
+  },
+  "DF12(XX)-20DP-0.5V": {
+    "width_mm": 1.0,
+    "length_mm": 5.0
+  },
+  "DFN3X3_10LEAD": {
+    "width_mm": 3.0,
+    "length_mm": 3.0
+  },
+  "DFN65P300X300X100-9N": {
+    "width_mm": 0.0,
+    "length_mm": 0.0
+  },
+  "FID1": {
+    "width_mm": 0.0,
+    "length_mm": 0.0
+  },
+  "FID2": {
+    "width_mm": 0.0,
+    "length_mm": 0.0
+  },
+  "FID3": {
+    "width_mm": 0.0,
+    "length_mm": 0.0
+  },
+  "FID4": {
+    "width_mm": 0.0,
+    "length_mm": 0.0
+  },
+  "MICRO-AB-H-SMT": {
+    "width_mm": 0.0,
+    "length_mm": 0.0
+  },
+  "PICO-SPOX-5": {
+    "width_mm": 0.0,
+    "length_mm": 0.0
+  },
+  "QFN50P400X400X80-25N": {
+    "width_mm": 0.0,
+    "length_mm": 0.0
+  },
+  "R-PDSO-N5": {
+    "width_mm": 0.0,
+    "length_mm": 0.0
+  },
+  "SOT23-6": {
+    "width_mm": 0.0,
+    "length_mm": 0.0
+  },
+  "SOT363": {
+    "width_mm": 0.0,
+    "length_mm": 0.0
+  },
+  "SOT996-2/3": {
+    "width_mm": 0.0,
+    "length_mm": 0.0
+  },
+  "TF-MICRO-SD_PP2": {
+    "width_mm": 0.0,
+    "length_mm": 0.0
+  },
+  "TRIM-PVZ2A": {
+    "width_mm": 0.0,
+    "length_mm": 0.0
+  },
+  "VSSOP-8": {
+    "width_mm": 0.0,
+    "length_mm": 0.0
+  },
+  "_0603MP": {
+    "width_mm": 0.0,
+    "length_mm": 0.0
+  }
+}
