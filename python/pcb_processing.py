@@ -482,6 +482,7 @@ def launch_image_viewer(image_path, master=None, overlay_points=None, packages=N
 
             global pixel_per_mm_scale, pcb_w
             pixel_per_mm_scale = (new_size[0]-1) / pcb_w
+            #print(f"Pixel/mm scale: {pixel_per_mm_scale:.2f} px/mm")
             
             # Draw overlay points using OpenCV
             if overlay_enabled.get():
@@ -492,16 +493,17 @@ def launch_image_viewer(image_path, master=None, overlay_points=None, packages=N
                     label = pt[2] if len(pt) >= 3 else None
                     
                     # Draw center crosshair
-                    cv2.line(img_array, (cx-10, cy), (cx+10, cy), (255, 0, 0), 1)
-                    cv2.line(img_array, (cx, cy-10), (cx, cy+10), (255, 0, 0), 1)
+                    crosshair_size = 5
+                    cv2.line(img_array, (cx-crosshair_size, cy), (cx+crosshair_size, cy), (255, 0, 0), 1)
+                    cv2.line(img_array, (cx, cy-crosshair_size), (cx, cy+crosshair_size), (255, 0, 0), 1)
                     
                     # Draw component label
                     if label:
                         cv2.putText(img_array, str(label), (cx+12, cy-12),
-                                    cv2.FONT_HERSHEY_SIMPLEX, max(0.25, 2*scale),
+                                    cv2.FONT_HERSHEY_SIMPLEX, max(0.25, 0.5),
                                     (0, 0, 0), 3, cv2.LINE_AA)
                         cv2.putText(img_array, str(label), (cx+12, cy-12),
-                                    cv2.FONT_HERSHEY_SIMPLEX, max(0.25, 2*scale),
+                                    cv2.FONT_HERSHEY_SIMPLEX, max(0.25, 0.5),
                                     (255, 255, 255), 1, cv2.LINE_AA)
 
                     #Draw package outline if known
@@ -509,22 +511,16 @@ def launch_image_viewer(image_path, master=None, overlay_points=None, packages=N
                     rotation = pt[4]
                     if package in PACKAGE_DIMENSIONS:
                         pkg_w, pkg_h = PACKAGE_DIMENSIONS[package]
-                        #half_pkg_w = int(pkg_w * pixel_per_mm_scale /2 * scale)
-                        #half_pkg_h = int(pkg_h * pixel_per_mm_scale /2 * scale)
-                        
-                        # Account for rotation when drawing package outline
                         center = (cx, cy)
-                        size = (pkg_w * pixel_per_mm_scale * scale, pkg_h * pixel_per_mm_scale * scale)
+                        size = (pkg_w * pixel_per_mm_scale, pkg_h * pixel_per_mm_scale)
                         angle = rotation
                         box = cv2.boxPoints((center, size, angle))
                         box = np.int0(box)
+                        cv2.drawContours(img_array, [box], 0, (255, 0, 0), 1)
 
-            
             # Convert back to PIL and then to PhotoImage
             resized_pil = Image.fromarray(img_array)
             tk_img = ImageTk.PhotoImage(resized_pil)
-
-
             
             # Draw grid
             if grid_enabled.get():
