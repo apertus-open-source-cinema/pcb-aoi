@@ -432,6 +432,7 @@ def launch_image_viewer(image_path, master=None, overlay_points=None, packages=N
     overlay_enabled = tk.BooleanVar(value=True)
     grid_enabled = tk.BooleanVar(value=False)
     overlay_points = overlay_points if overlay_points is not None else []
+    overlay_map = {pt[2]: pt for pt in overlay_points if len(pt) >= 3}
     
     board_transform = None
     board_half_w = None
@@ -440,6 +441,13 @@ def launch_image_viewer(image_path, master=None, overlay_points=None, packages=N
     orig_img = None
     curr_img_arr = None
     curr_pil_img = pil_img
+    
+    # Comparison mode settings (must be defined before nested functions)
+    comparison_mode = tk.BooleanVar(value=False)
+    comparison_results = []
+    
+    # Interface dictionary (defined early for closure access)
+    viewer = {}
 
     def set_image(new_pil):
         nonlocal curr_img_arr, orig_img, curr_pil_img
@@ -484,6 +492,14 @@ def launch_image_viewer(image_path, master=None, overlay_points=None, packages=N
             pixel_per_mm_scale = (new_size[0]-1) / pcb_w
             #print(f"Pixel/mm scale: {pixel_per_mm_scale:.2f} px/mm")
             
+            # Create results map for fast lookup
+            results_map = {}
+            results = viewer.get("comparison_results", [])
+            if results:
+                for res in results:
+                    if len(res) >= 6:
+                        results_map[res[0]] = res[5]
+            
             # Draw overlay points using OpenCV
             if overlay_enabled.get():
                 for pt in overlay_points:
@@ -494,8 +510,8 @@ def launch_image_viewer(image_path, master=None, overlay_points=None, packages=N
                     
                     # Draw center crosshair
                     crosshair_size = 5
-                    cv2.line(img_array, (cx-crosshair_size, cy), (cx+crosshair_size, cy), (255, 0, 0), 1)
-                    cv2.line(img_array, (cx, cy-crosshair_size), (cx, cy+crosshair_size), (255, 0, 0), 1)
+                    cv2.line(img_array, (cx-crosshair_size, cy), (cx+crosshair_size, cy), (180, 180, 180), 1)
+                    cv2.line(img_array, (cx, cy-crosshair_size), (cx, cy+crosshair_size), (180, 1080, 180), 1)
                     
                     # Draw component label
                     if label:
@@ -515,20 +531,30 @@ def launch_image_viewer(image_path, master=None, overlay_points=None, packages=N
                         size = (pkg_w * pixel_per_mm_scale, pkg_h * pixel_per_mm_scale)
                         angle = rotation
                         box = cv2.boxPoints((center, size, angle))
-                        box = np.int0(box)
-                        cv2.drawContours(img_array, [box], 0, (255, 0, 0), 1)
+                        box = np.intp(box)
+                        
+                        # Determine color based on match value
+                        color = (255, 0, 0) # Default Red
+                        if label in results_map:
+                            max_val = results_map[label]
+                            if max_val > 0.8:
+                                color = (0, 255, 0) # Green
+                                cv2.drawContours(img_array, [box], 0, color, 1)
+                            else:
+                                color = (255, 0, 0) # Red
+                                cv2.drawContours(img_array, [box], 0, color, 2)
+
+            # Draw grid
+            if grid_enabled.get():
+                if board_transform is not None and board_half_w is not None and board_half_h is not None:
+                    draw_grid(img_array)
+                else:
+                    cv2.putText(img_array, "Grid: missing transform", (10, 25),
+                                cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 0, 255), 2)
 
             # Convert back to PIL and then to PhotoImage
             resized_pil = Image.fromarray(img_array)
             tk_img = ImageTk.PhotoImage(resized_pil)
-            
-            # Draw grid
-            if grid_enabled.get():
-                if board_transform is not None and board_half_w is not None and board_half_h is not None:
-                    draw_grid(tk_img)
-                else:
-                    cv2.putText(tk_img, "Grid: missing transform", (10, 25),
-                                cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 0, 255), 2)
             
             canvas.config(width=new_size[0], height=new_size[1])
             canvas.itemconfig(canvas_img, image=tk_img)
@@ -539,9 +565,10 @@ def launch_image_viewer(image_path, master=None, overlay_points=None, packages=N
 
     def draw_grid(img):
         h, w = img.shape[:2]
-        grid_color = (0, 255, 255)  # Yellow in BGR
+        grid_color = (255, 255, 0)  # Yellow in BGR
         grid_spacing_mm = 10.0  # Strict 10mm grid spacing
         grid_alpha = 0.5  # 50% transparency
+        scale = zoom_state["scale"]
 
         # Create a transparent overlay for the grid
         overlay = img.copy()
@@ -557,9 +584,10 @@ def launch_image_viewer(image_path, master=None, overlay_points=None, packages=N
                 [[[x_val, -y_val]] for y_val in np.linspace(-board_half_h, board_half_h, 100)],
                 dtype=np.float32,
             )
-            mapped = cv2.perspectiveTransform(pts, board_transform).reshape(-1, 2).astype(int)
+            mapped = cv2.perspectiveTransform(pts, board_transform).reshape(-1, 2)
+            mapped = (mapped * scale).astype(int)
             for i in range(len(mapped) - 1):
-                cv2.line(overlay, tuple(mapped[i]), tuple(mapped[i + 1]), grid_color, 2)
+                cv2.line(overlay, tuple(mapped[i]), tuple(mapped[i + 1]), grid_color, 1)
 
         # Horizontal grid lines at strict 10mm intervals
         y_positions = np.arange(
@@ -572,12 +600,85 @@ def launch_image_viewer(image_path, master=None, overlay_points=None, packages=N
                 [[[x_val, -y_val]] for x_val in np.linspace(-board_half_w, board_half_w, 100)],
                 dtype=np.float32,
             )
-            mapped = cv2.perspectiveTransform(pts, board_transform).reshape(-1, 2).astype(int)
+            mapped = cv2.perspectiveTransform(pts, board_transform).reshape(-1, 2)
+            mapped = (mapped * scale).astype(int)
             for i in range(len(mapped) - 1):
-                cv2.line(overlay, tuple(mapped[i]), tuple(mapped[i + 1]), grid_color, 2)
+                cv2.line(overlay, tuple(mapped[i]), tuple(mapped[i + 1]), grid_color, 1)
 
         # Blend the overlay with the original image at 50% transparency
         cv2.addWeighted(overlay, grid_alpha, img, 1 - grid_alpha, 0, img)
+
+    def toggle_comparison_mode():
+        """Toggle between reference image and comparison mode."""
+        nonlocal comparison_mode, comparison_results
+        
+        comparison_mode.set(not comparison_mode.get())
+        
+        if comparison_mode.get() and "comparison_results" in viewer:
+            # Enable comparison mode
+            comparison_results = viewer["comparison_results"]
+            update_comparison_display()
+        else:
+            # Disable comparison mode - restore reference image
+            if orig_img is not None:
+                curr_img_arr = orig_img.copy()
+                update_display()
+
+    # Pass comparison_mode to viewer - moved to after viewer definition
+
+    def update_comparison_display():
+        """Update display with comparison results."""
+        nonlocal comparison_results, curr_img_arr
+
+        if not comparison_mode.get() or orig_img is None:
+            return
+        
+        # Start from original clean image
+        display = orig_img.copy()
+        
+        # Draw comparison results
+        for result in comparison_results:
+            # Unpack result (handle potential variable length for backward compatibility)
+            if len(result) >= 9:
+                designator, match_status, diff_x, diff_y, diff_area, max_val, _, _, _ = result
+            else:
+                designator, match_status, diff_x, diff_y, diff_area = result
+                max_val = 0
+            
+            # Color based on match status
+            if match_status:
+                color = (0, 255, 0)  # Green for match
+                status_text = "MATCH"
+            else:
+                color = (0, 0, 255)  # Red for mismatch
+                status_text = "MISMATCH"
+            
+            if designator in overlay_map:
+                pt = overlay_map[designator]
+                cx, cy = int(pt[0]), int(pt[1])
+                package = pt[3]
+                rotation = pt[4]
+
+                # Draw package outline if known
+                if package in PACKAGE_DIMENSIONS:
+                    pkg_w, pkg_h = PACKAGE_DIMENSIONS[package]
+                    size = (pkg_w * pixel_per_mm_scale, pkg_h * pixel_per_mm_scale)
+                    box = cv2.boxPoints(((cx, cy), size, rotation))
+                    box = np.intp(box)
+                    cv2.drawContours(display, [box], 0, color, 2)
+                else:
+                    cv2.circle(display, (cx, cy), 15, color, 2)
+                
+                # Draw status text
+                cv2.putText(display, f"{max_val:.2f}", (cx + 10, cy - 10),
+                           cv2.FONT_HERSHEY_SIMPLEX, 0.5, color, 2)
+            else:
+                # Fallback if position lost
+                cx, cy = int(display.shape[1] // 2), int(display.shape[0] // 2)
+                cv2.putText(display, f"{designator}?", (cx, cy), cv2.FONT_HERSHEY_SIMPLEX, 1, color, 2)
+        
+        curr_img_arr = display
+        update_display()
 
     def set_zoom(new_scale, center=None):
         new_scale = float(new_scale)
@@ -615,7 +716,11 @@ def launch_image_viewer(image_path, master=None, overlay_points=None, packages=N
     tk.Checkbutton(control_frame, text="Grid", variable=grid_enabled,
                    command=update_display).pack(side="right", padx=4)
     
-    tk.Button(control_frame, text="Zoom In", 
+    # Comparison mode toggle button
+    tk.Button(control_frame, text="Compare Components",
+              command=toggle_comparison_mode).pack(side="right", padx=4)
+    
+    tk.Button(control_frame, text="Zoom In",
               command=lambda: set_zoom(zoom_state["scale"] * 1.2)).pack(side="right")
     tk.Button(control_frame, text="Zoom Out",
               command=lambda: set_zoom(zoom_state["scale"] / 1.2)).pack(side="right")
@@ -665,11 +770,23 @@ def launch_image_viewer(image_path, master=None, overlay_points=None, packages=N
         nonlocal board_transform, board_half_w, board_half_h
         board_transform, board_half_w, board_half_h = t, hw, hh
 
-    viewer = {
+    def set_comparison_mode(enabled):
+        nonlocal comparison_mode
+        comparison_mode.set(enabled)
+        if enabled:
+            update_comparison_display()
+        else:
+            if orig_img is not None:
+                curr_img_arr = orig_img.copy()
+                update_display()
+
+    viewer.update({
         "set_image": set_image,
         "set_board_transform": set_board_transform,
+        "set_comparison_mode": set_comparison_mode,
         "refresh": update_display,
-    }
+        "comparison_mode": comparison_mode,
+    })
 
     if owns_root:
         window.mainloop()
@@ -726,6 +843,83 @@ def launch_mnt_viewer(mnt_path, master=None, components=None):
         window.mainloop()
 
 
+def launch_comparison_table(comparison_results, master=None):
+    """Launch comparison results table with images."""
+    if tk is None or Image is None or ImageTk is None:
+        print("Tkinter/Pillow not available")
+        return
+
+    owns_root = False
+    if master is None:
+        master = tk.Tk()
+        owns_root = True
+
+    window = master if owns_root else tk.Toplevel(master)
+    window.title("Comparison Results")
+    window.geometry("1000x600")
+
+    # Create container for canvas and scrollbar
+    container = ttk.Frame(window)
+    container.pack(fill="both", expand=True)
+    
+    canvas = tk.Canvas(container)
+    scrollbar = ttk.Scrollbar(container, orient="vertical", command=canvas.yview)
+    scrollable_frame = ttk.Frame(canvas)
+
+    scrollable_frame.bind(
+        "<Configure>",
+        lambda e: canvas.configure(scrollregion=canvas.bbox("all"))
+    )
+
+    canvas.create_window((0, 0), window=scrollable_frame, anchor="nw")
+    canvas.configure(yscrollcommand=scrollbar.set)
+
+    canvas.pack(side="left", fill="both", expand=True)
+    scrollbar.pack(side="right", fill="y")
+
+    # Headers
+    headers = ["Designator", "Package", "Match Val", "Ref Image", "Cmp Image"]
+    for i, h in enumerate(headers):
+        ttk.Label(scrollable_frame, text=h, font=("Arial", 10, "bold")).grid(row=0, column=i, padx=5, pady=5)
+
+    # Keep references to images
+    window.image_refs = []
+
+    for i, result in enumerate(comparison_results):
+        # Unpack tuple (designator, match_status, diff_x, diff_y, diff_area, max_val, ref_crop, sec_crop, package)
+        if len(result) < 9: continue
+        designator, match_status, _, _, _, max_val, ref_crop, sec_crop, package = result
+        
+        row = i + 1
+        fg_color = "green" if match_status else "red"
+        
+        ttk.Label(scrollable_frame, text=designator).grid(row=row, column=0, padx=5, pady=5)
+        ttk.Label(scrollable_frame, text=package).grid(row=row, column=1, padx=5, pady=5)
+        ttk.Label(scrollable_frame, text=f"{max_val:.3f}", foreground=fg_color).grid(row=row, column=2, padx=5, pady=5)
+
+        def create_photo(crop):
+            if crop is None or crop.size == 0: return None
+            h, w = crop.shape[:2]
+            scale = 2
+            resized = cv2.resize(crop, (w*scale, h*scale), interpolation=cv2.INTER_NEAREST)
+            return ImageTk.PhotoImage(Image.fromarray(resized))
+
+        ref_photo = create_photo(ref_crop)
+        if ref_photo:
+            l = ttk.Label(scrollable_frame, image=ref_photo)
+            l.grid(row=row, column=3, padx=5, pady=5)
+            window.image_refs.append(ref_photo)
+
+        sec_photo = create_photo(sec_crop)
+        if sec_photo:
+            l = ttk.Label(scrollable_frame, image=sec_photo)
+            l.grid(row=row, column=4, padx=5, pady=5)
+            window.image_refs.append(sec_photo)
+
+    if owns_root:
+        window.mainloop()
+
+
 def launch_config_viewer(cfg_path, master=None):
     """Launch PCB config viewer."""
     if tk is None:
@@ -764,10 +958,11 @@ def main():
     print("apertus° PCB inspector")
     
     if len(sys.argv) < 2:
-        print("Usage: python pcb_processing.py <image_path>")
+        print("Usage: python pcb_processing.py <image_path> [second_image_path]")
         sys.exit(1)
 
     image_path = sys.argv[1]
+    second_image_path = sys.argv[2] if len(sys.argv) > 2 else None
     
     # Setup tkinter
     root = None
@@ -834,14 +1029,15 @@ def main():
     print("Detected fiducials in image:")
     for i, pos in enumerate(fiducialPositions):
         print(f"  {i+1}: ({pos[0]:.0f}, {pos[1]:.0f})")
-
+    
     # Apply transform
     img_warped, transform, warped_w, warped_h = apply_perspective_transform(
-        img_ref, fiducialPositions, 
-        pcb_width=board_cfg.get("pcb_width"), 
-        pcb_height=board_cfg.get("pcb_height"), 
+        img_ref, fiducialPositions,
+        pcb_width=board_cfg.get("pcb_width"),
+        pcb_height=board_cfg.get("pcb_height"),
         fiducial_positions_mm=fiducialBoardPositions
     )
+    img_warped_gray = cv2.cvtColor(img_warped, cv2.COLOR_RGB2GRAY)
     print(f"Warped: {warped_w}x{warped_h}")
 
     # Compute component overlay positions
@@ -863,6 +1059,143 @@ def main():
         # Setup viewer transform
         if image_viewer:
             image_viewer["set_board_transform"](M, half_w, half_h)
+
+    # Process second image for comparison if provided
+    if second_image_path and os.path.exists(second_image_path):
+        print(f"\nProcessing comparison image: {second_image_path}")
+        
+        # Load and process second image
+        img_second = cv2.imread(second_image_path, 1)
+        if img_second is not None:
+            img_second_gray = cv2.cvtColor(img_second, cv2.COLOR_RGB2GRAY)
+            
+            # Find fiducials in second image
+            fiducialPositions_second = find_all_fiducials(img_second_gray, template)
+            
+            print("Detected fiducials in second image:")
+            for i, pos in enumerate(fiducialPositions_second):
+                print(f"  {i+1}: ({pos[0]:.0f}, {pos[1]:.0f})")
+            
+            # Apply perspective transform to second image
+            img_second_warped, transform_second, warped_w_second, warped_h_second = apply_perspective_transform(
+                img_second, fiducialPositions_second,
+                pcb_width=board_cfg.get("pcb_width"),
+                pcb_height=board_cfg.get("pcb_height"),
+                fiducial_positions_mm=fiducialBoardPositions
+            )
+            img_second_warped_gray = cv2.cvtColor(img_second_warped, cv2.COLOR_RGB2GRAY)
+            print(f"Second image warped: {warped_w_second}x{warped_h_second}")
+            
+            # Compare components
+            if components and fiducialBoardPositions and pcb_w and pcb_h:
+                
+                # Transform component positions for second image
+                M_second = compute_board_to_image_transform(pcb_w, pcb_h, warped_w_second, warped_h_second)
+                overlay_points_second = transform_component_positions(components, M_second, warped_w_second, warped_h_second)
+                
+                # Compare each component using template matching
+                comparison_results = []
+                # Template matching parameters
+                MATCH_THRESHOLD = 0.8  # for TM_CCOEFF_NORMED
+                
+                print(f"Comparing components between images with match threshold {MATCH_THRESHOLD}:")
+
+                for i, (ref_pt, comp_pt) in enumerate(zip(overlay_points, overlay_points_second)):
+                    if len(ref_pt) >= 5 and len(comp_pt) >= 5:
+                        designator = ref_pt[2]
+                        
+                        if designator.startswith("FID"):
+                            continue  # Skip fiducials in comparison
+
+                        # skip if package dimensions are zero
+                        if (comp_pt[3] not in PACKAGE_DIMENSIONS) or (PACKAGE_DIMENSIONS[comp_pt[3]] == (0, 0)):
+                            continue
+
+                        ref_x, ref_y = int(ref_pt[0]), int(ref_pt[1])
+                        comp_x, comp_y = int(comp_pt[0]), int(comp_pt[1])
+
+                        # Calculate template size based on package
+                        package = ref_pt[3]
+                        rotation = ref_pt[4]
+                        
+                        template = None
+                        sec_crop = None
+                        t_w, t_h = 20, 20  # Default size
+                        
+                        if package in PACKAGE_DIMENSIONS:
+                            pkg_w, pkg_h = PACKAGE_DIMENSIONS[package]
+                            
+                            MARGIN = 1.5 #50% margin to account for slight misalignments
+                            
+                            # Calculate size in pixels
+                            px_w = pkg_w * pixel_per_mm_scale * MARGIN
+                            px_h = pkg_h * pixel_per_mm_scale * MARGIN
+                            
+                            # Swap dimensions if rotated approx 90 degrees
+                            if 45 < (abs(rotation) % 180) < 135:
+                                px_w, px_h = px_h, px_w
+                            
+                            t_w, t_h = int(px_w), int(px_h)
+                            # Ensure minimum size
+                            t_w = max(t_w, 10)
+                            t_h = max(t_h, 10)
+                        
+                        half_w = t_w // 2
+                        half_h = t_h // 2
+                        
+                        # Extract template from reference warped grayscale image
+                        # Check bounds
+                        if (ref_y - half_h < 0) or (ref_y + half_h >= img_warped_gray.shape[0]) or \
+                        (ref_x - half_w < 0) or (ref_x + half_w >= img_warped_gray.shape[1]):
+                            # Out of bounds, cannot extract template
+                            match_status = False
+                            diff_x = 0
+                            diff_y = 0
+                            max_val = 0
+                        else:
+                            template = img_warped_gray[ref_y - half_h:ref_y + half_h, ref_x - half_w:ref_x + half_w]
+                            
+                            # Save debug images
+                            debug_dir = "debug_crops"
+                            if not os.path.exists(debug_dir):
+                                os.makedirs(debug_dir)
+                            cv2.imwrite(os.path.join(debug_dir, f"{designator}_ref.png"), template)
+                            
+                            # Extract corresponding crop from second image for debug
+                            if (comp_y - half_h >= 0) and (comp_y + half_h < img_second_warped_gray.shape[0]) and \
+                               (comp_x - half_w >= 0) and (comp_x + half_w < img_second_warped_gray.shape[1]):
+                                sec_crop = img_second_warped_gray[comp_y - half_h:comp_y + half_h, comp_x - half_w:comp_x + half_w]
+                                cv2.imwrite(os.path.join(debug_dir, f"{designator}_sec.png"), sec_crop)
+
+                            # Perform template matching on second warped grayscale image
+                            result = cv2.matchTemplate(sec_crop, template, cv2.TM_CCOEFF_NORMED)
+                            _, max_val, _, max_loc = cv2.minMaxLoc(result)
+                            # Calculate center of matched template in second image
+                            matched_center_x = max_loc[0] + half_w
+                            matched_center_y = max_loc[1] + half_h
+                            # Calculate differences between matched position and expected position
+                            diff_x = abs(matched_center_x - comp_x)
+                            diff_y = abs(matched_center_y - comp_y)
+                            # Determine match status based on match value
+                            match_status = (max_val > MATCH_THRESHOLD) 
+                        
+                        diff_area = diff_x * diff_y  # maintain same format as before
+                        
+                        comparison_results.append((
+                            designator, match_status, diff_x, diff_y, diff_area,
+                            max_val, template, sec_crop, package
+                        ))
+
+                        if (max_val < MATCH_THRESHOLD):
+                            print(f"Component {designator}: {'MATCH' if match_status else 'MISMATCH'} (Δx={diff_x:.2f}, Δy={diff_y:.2f}, match_val={max_val:.2f})")
+                
+                # Store comparison results in viewer
+                if image_viewer:
+                    image_viewer["comparison_results"] = comparison_results
+                    image_viewer["set_comparison_mode"](False)  # Start in reference mode
+                    
+                if comparison_results:
+                     launch_comparison_table(comparison_results, master=root)
 
     # Show warped image
     if image_viewer:
