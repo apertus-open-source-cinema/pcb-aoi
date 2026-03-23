@@ -16,8 +16,8 @@
     "length_mm": 3.0
   },
   "DFN65P300X300X100-9N": {
-    "width_mm": 0.0,
-    "length_mm": 0.0
+    "width_mm": 3.0,
+    "length_mm": 3.0
   },
   "FID1": {
     "width_mm": 0.0,
@@ -56,8 +56,8 @@
     "length_mm": 1.6
   },
   "SOT363": {
-    "width_mm": 0.0,
-    "length_mm": 0.0
+    "width_mm": 2.0,
+    "length_mm": 2.0
   },
   "SOT996-2/3": {
     "width_mm": 0.0,

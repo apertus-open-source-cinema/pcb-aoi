@@ -116,53 +116,61 @@ def create_packages_config_gui(master=None, components=None):
     tree.column("Length (mm)", anchor="center")
 
     # Make width and length columns editable
-    editing = None
-
     def on_double_click(event):
-        global editing
-        item = tree.identify_row(event.y)
+        # Clean up any existing entry widgets
+        for widget in tree.winfo_children():
+            if isinstance(widget, tk.Entry):
+                widget.destroy()
+
+        region = tree.identify("region", event.x, event.y)
+        if region != "cell":
+            return
+
         column = tree.identify_column(event.x)
-        if item and column in ("#3", "#4"):  # Width and Length columns
-            editing = (item, column)
-            text = tree.item(item, "values")[int(column[1:]) - 1]
-            x, y, width, height = tree.bbox(item, column)
-            entry = tk.Entry(root, width=width, relief=tk.FLAT, borderwidth=0)
-            entry.insert(0, text)
-            entry.place(x=x+1, y=y+1, width=width-2, height=height-2)
-            entry.focus_set()
-            entry.select_range(0, tk.END)
-            entry.bind("<Return>", lambda e: update_value(entry, item, column))
-            entry.bind("<Escape>", lambda e: cancel_edit(entry, item, column))
+        # Only allow editing Width (#3) and Length (#4)
+        if column not in ("#3", "#4"):
+            return
 
-    def on_return_press(event):
-        if editing:
-            item, column = editing
-            entry = root.focus_get()
-            if isinstance(entry, tk.Entry):
-                update_value(entry, item, column)
+        item = tree.identify_row(event.y)
+        if not item:
+            return
 
-    def update_value(entry, item, column):
-        global editing
-        new_value = entry.get()
-        try:
-            float(new_value)  # Validate that it's a number
-            tree.item(item, values=update_tuple(tree.item(item, "values"), int(column[1:]) - 1, new_value))
+        # Get cell coordinates
+        bbox = tree.bbox(item, column)
+        if not bbox:
+            return
+        x, y, w, h = bbox
+
+        # Get current value
+        col_idx = int(column[1:]) - 1
+        values = tree.item(item, "values")
+        current_val = values[col_idx]
+
+        # Create entry widget inside the treeview
+        entry = tk.Entry(tree, relief=tk.FLAT)
+        entry.place(x=x, y=y, width=w, height=h)
+        entry.insert(0, current_val)
+        entry.select_range(0, tk.END)
+        entry.focus_set()
+
+        def save_edit(event=None):
+            try:
+                val = float(entry.get())
+                new_values = list(tree.item(item, "values"))
+                new_values[col_idx] = str(val)
+                tree.item(item, values=new_values)
+                entry.destroy()
+            except ValueError:
+                entry.configure(bg="#ffcccc")
+
+        def cancel_edit(event=None):
             entry.destroy()
-            editing = None
-        except ValueError:
-            entry.config(background="pink")
-            entry.after(500, lambda: entry.config(background="white"))
 
-    def cancel_edit(entry, item, column):
-        global editing
-        entry.destroy()
-        editing = None
-
-    def update_tuple(tup, index, value):
-        return tup[:index] + (value,) + tup[index+1:]
+        entry.bind("<Return>", save_edit)
+        entry.bind("<Escape>", cancel_edit)
+        entry.bind("<FocusOut>", lambda e: cancel_edit())
 
     tree.bind("<Double-1>", on_double_click)
-    tree.bind("<Return>", on_return_press)
 
     # Add scrollbars
     vsb = ttk.Scrollbar(table_frame, orient="vertical", command=tree.yview)
@@ -235,8 +243,6 @@ def create_packages_config_gui(master=None, components=None):
         hsb.set(*tree.xview())
 
     root.bind("<Configure>", on_resize)
-    root.bind("<Double-1>", on_double_click)
-    root.bind("<Return>", on_return_press)
 
     # Handle window closing properly
     def handle_closing():
