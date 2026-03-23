@@ -713,16 +713,12 @@ def launch_image_viewer(image_path, master=None, overlay_points=None, packages=N
     
     tk.Checkbutton(control_frame, text="Overlay", variable=overlay_enabled,
                    command=update_display).pack(side="right", padx=4)
-    tk.Checkbutton(control_frame, text="Grid", variable=grid_enabled,
+    tk.Checkbutton(control_frame, text="10mm Grid", variable=grid_enabled,
                    command=update_display).pack(side="right", padx=4)
     
-    # Comparison mode toggle button
-    tk.Button(control_frame, text="Compare Components",
-              command=toggle_comparison_mode).pack(side="right", padx=4)
-    
-    tk.Button(control_frame, text="Zoom In",
+    tk.Button(control_frame, text="Zoom +",
               command=lambda: set_zoom(zoom_state["scale"] * 1.2)).pack(side="right")
-    tk.Button(control_frame, text="Zoom Out",
+    tk.Button(control_frame, text="Zoom -",
               command=lambda: set_zoom(zoom_state["scale"] / 1.2)).pack(side="right")
 
     zoom_slider = tk.Scale(control_frame, from_=0.1, to=10.0, orient="horizontal",
@@ -892,7 +888,7 @@ def launch_comparison_table(comparison_results, master=None):
     window.image_refs = []
     
     # Current width state (pixels)
-    current_width = [100]
+    current_width = [40]
 
     def populate_table():
         # Clear existing
@@ -940,7 +936,7 @@ def launch_comparison_table(comparison_results, master=None):
                 window.image_refs.append(sec_photo)
 
     def change_size(delta):
-        current_width[0] = max(20, min(500, current_width[0] + delta))
+        current_width[0] = max(10, min(300, current_width[0] + delta))
         populate_table()
 
     ttk.Button(control_frame, text="Increase Size (+)", command=lambda: change_size(20)).pack(side="left", padx=5)
