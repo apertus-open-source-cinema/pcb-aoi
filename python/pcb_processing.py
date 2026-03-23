@@ -849,6 +849,9 @@ def launch_comparison_table(comparison_results, master=None):
         print("Tkinter/Pillow not available")
         return
 
+    # Sort results: Mismatches (False) first, then Matches (True)
+    sorted_results = sorted(comparison_results, key=lambda x: x[1])
+
     owns_root = False
     if master is None:
         master = tk.Tk()
@@ -857,6 +860,10 @@ def launch_comparison_table(comparison_results, master=None):
     window = master if owns_root else tk.Toplevel(master)
     window.title("Comparison Results")
     window.geometry("1000x600")
+
+    # Control frame
+    control_frame = ttk.Frame(window)
+    control_frame.pack(side="top", fill="x", padx=5, pady=5)
 
     # Create container for canvas and scrollbar
     container = ttk.Frame(window)
@@ -871,50 +878,75 @@ def launch_comparison_table(comparison_results, master=None):
         lambda e: canvas.configure(scrollregion=canvas.bbox("all"))
     )
 
-    canvas.create_window((0, 0), window=scrollable_frame, anchor="nw")
+    window_id = canvas.create_window((0, 0), window=scrollable_frame, anchor="nw")
     canvas.configure(yscrollcommand=scrollbar.set)
 
     canvas.pack(side="left", fill="both", expand=True)
     scrollbar.pack(side="right", fill="y")
 
-    # Headers
-    headers = ["Designator", "Package", "Match Val", "Ref Image", "Cmp Image"]
-    for i, h in enumerate(headers):
-        ttk.Label(scrollable_frame, text=h, font=("Arial", 10, "bold")).grid(row=0, column=i, padx=5, pady=5)
+    def on_canvas_configure(event):
+        canvas.itemconfig(window_id, width=event.width)
+    canvas.bind("<Configure>", on_canvas_configure)
 
     # Keep references to images
     window.image_refs = []
+    
+    # Current width state (pixels)
+    current_width = [100]
 
-    for i, result in enumerate(comparison_results):
-        # Unpack tuple (designator, match_status, diff_x, diff_y, diff_area, max_val, ref_crop, sec_crop, package)
-        if len(result) < 9: continue
-        designator, match_status, _, _, _, max_val, ref_crop, sec_crop, package = result
-        
-        row = i + 1
-        fg_color = "green" if match_status else "red"
-        
-        ttk.Label(scrollable_frame, text=designator).grid(row=row, column=0, padx=5, pady=5)
-        ttk.Label(scrollable_frame, text=package).grid(row=row, column=1, padx=5, pady=5)
-        ttk.Label(scrollable_frame, text=f"{max_val:.3f}", foreground=fg_color).grid(row=row, column=2, padx=5, pady=5)
+    def populate_table():
+        # Clear existing
+        for widget in scrollable_frame.winfo_children():
+            widget.destroy()
+        window.image_refs.clear()
 
-        def create_photo(crop):
-            if crop is None or crop.size == 0: return None
-            h, w = crop.shape[:2]
-            scale = 2
-            resized = cv2.resize(crop, (w*scale, h*scale), interpolation=cv2.INTER_NEAREST)
-            return ImageTk.PhotoImage(Image.fromarray(resized))
+        # Headers
+        headers = ["Designator", "Package", "Match Val", "Ref Image", "Cmp Image"]
+        for i, h in enumerate(headers):
+            ttk.Label(scrollable_frame, text=h, font=("Arial", 10, "bold"), anchor="center").grid(row=0, column=i, padx=5, pady=5, sticky="ew")
+            scrollable_frame.columnconfigure(i, weight=1)
 
-        ref_photo = create_photo(ref_crop)
-        if ref_photo:
-            l = ttk.Label(scrollable_frame, image=ref_photo)
-            l.grid(row=row, column=3, padx=5, pady=5)
-            window.image_refs.append(ref_photo)
+        for i, result in enumerate(sorted_results):
+            # Unpack tuple (designator, match_status, diff_x, diff_y, diff_area, max_val, ref_crop, sec_crop, package)
+            if len(result) < 9: continue
+            designator, match_status, _, _, _, max_val, ref_crop, sec_crop, package = result
+            
+            row = i + 1
+            fg_color = "green" if match_status else "red"
+            
+            ttk.Label(scrollable_frame, text=designator, anchor="center").grid(row=row, column=0, padx=5, pady=5, sticky="ew")
+            ttk.Label(scrollable_frame, text=package, anchor="center").grid(row=row, column=1, padx=5, pady=5, sticky="ew")
+            ttk.Label(scrollable_frame, text=f"{max_val:.3f}", foreground=fg_color, anchor="center").grid(row=row, column=2, padx=5, pady=5, sticky="ew")
 
-        sec_photo = create_photo(sec_crop)
-        if sec_photo:
-            l = ttk.Label(scrollable_frame, image=sec_photo)
-            l.grid(row=row, column=4, padx=5, pady=5)
-            window.image_refs.append(sec_photo)
+            def create_photo(crop):
+                if crop is None or crop.size == 0: return None
+                h, w = crop.shape[:2]
+                if w == 0: return None
+                target_w = current_width[0]
+                scale = target_w / w
+                resized = cv2.resize(crop, (target_w, int(h*scale)), interpolation=cv2.INTER_NEAREST)
+                return ImageTk.PhotoImage(Image.fromarray(resized))
+
+            ref_photo = create_photo(ref_crop)
+            if ref_photo:
+                l = ttk.Label(scrollable_frame, image=ref_photo, anchor="center")
+                l.grid(row=row, column=3, padx=5, pady=5, sticky="ew")
+                window.image_refs.append(ref_photo)
+
+            sec_photo = create_photo(sec_crop)
+            if sec_photo:
+                l = ttk.Label(scrollable_frame, image=sec_photo, anchor="center")
+                l.grid(row=row, column=4, padx=5, pady=5, sticky="ew")
+                window.image_refs.append(sec_photo)
+
+    def change_size(delta):
+        current_width[0] = max(20, min(500, current_width[0] + delta))
+        populate_table()
+
+    ttk.Button(control_frame, text="Increase Size (+)", command=lambda: change_size(20)).pack(side="left", padx=5)
+    ttk.Button(control_frame, text="Decrease Size (-)", command=lambda: change_size(-20)).pack(side="left", padx=5)
+
+    populate_table()
 
     if owns_root:
         window.mainloop()
