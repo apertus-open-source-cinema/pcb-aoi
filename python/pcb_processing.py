@@ -1010,7 +1010,7 @@ def main():
 
     # Launch packages config viewer
     if create_packages_config_gui is not None:
-        create_packages_config_gui(master=root)
+        create_packages_config_gui(master=root, components=components)
 
     # Launch image viewer
     image_viewer = launch_image_viewer(image_path, master=root, overlay_points=overlay_points)

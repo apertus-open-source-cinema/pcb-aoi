@@ -61,7 +61,7 @@ def on_closing(tree, status):
     save_data(tree, status)
     tree.master.destroy()
 
-def create_packages_config_gui(master=None):
+def create_packages_config_gui(master=None, components=None):
     """Create the main GUI window.
     
     Args:
@@ -173,20 +173,20 @@ def create_packages_config_gui(master=None):
 
     # Populate table
     def populate_table():
-        if parse_mnt_file:
-            # Try to find .mnt file in current directory
-            mnt_files = [f for f in os.listdir() if f.endswith('.mnt')]
-            if mnt_files:
-                components = parse_mnt_file(mnt_files[0])
-                packages = get_unique_packages(components)
-
-                for package, count in sorted(packages.items()):
-                    width, length = get_package_dimensions(package)
-                    tree.insert("", "end", values=(package, count, f"{width:.1f}", f"{length:.1f}"))
-            else:
-                tree.insert("", "end", values=("No .mnt file found", "", "", ""))
-        else:
-            tree.insert("", "end", values=("pcb_processing.py not found", "", "", ""))
+        # Use PACKAGE_DIMENSIONS which is already loaded from JSON
+        # and overlay component counts if provided
+        counts = {}
+        if components:
+            counts = get_unique_packages(components)
+        
+        # Combine all known packages
+        all_packages = set(PACKAGE_DIMENSIONS.keys()) | set(counts.keys())
+        
+        for package in sorted(all_packages):
+            count = counts.get(package, 0)
+            width, length = get_package_dimensions(package)
+            count_str = str(count) if count > 0 else "-"
+            tree.insert("", "end", values=(package, count_str, f"{width}", f"{length}"))
 
     populate_table()
 
