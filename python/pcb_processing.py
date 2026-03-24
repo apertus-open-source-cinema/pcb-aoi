@@ -35,7 +35,7 @@ except ImportError:
 
 
 # Global Variables
-fiducialTemplate = './python/templates/fiducial.tif'
+fiducialTemplate = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'templates', 'fiducial.tif')
 fiducialPositions = []  # Detected fiducial positions in image
 fiducialBoardPositions = {}  # Fiducial positions from .mnt file (mm, board coords)
 pixel_per_mm_scale = 0
@@ -80,18 +80,7 @@ def find_all_fiducials(img_gray, template):
         find_fiducial_in_region(img_gray, template, (half_w, 0, half_w, half_h))
     ]
     
-    # Sort to get: top-left, top-right, bottom-right, bottom-left
-    #sorted_by_y = sorted(positions, key=lambda p: p[1])
-    #top_points = sorted_by_y[:2]
-    #bottom_points = sorted_by_y[2:]
-    
     return positions
-    #[
-    #    min(top_points, key=lambda p: p[0]),
-    #    max(top_points, key=lambda p: p[0]),
-    #    max(bottom_points, key=lambda p: p[0]),
-    #    min(bottom_points, key=lambda p: p[0]),
-    #]
 def distance_2d(point1, point2):
     """
     Calculates the Euclidean distance between two 2D points.
@@ -173,57 +162,6 @@ def apply_perspective_transform(image, src_points, pcb_width=None, pcb_height=No
 
     width_px_per_mm = fid_width_px / fid_width_mm
     height_px_per_mm = fid_height_px / fid_height_mm
-    # If PCB dimensions and fiducial positions are provided, use them to calculate scale
-    #if pcb_width is not None and pcb_height is not None and fiducial_positions_mm:
-        # Calculate expected distances between fiducials based on their board positions
-       # expected_distances = []
-        
-        # Get fiducial names in the same order as src_points
-        # fiducial_names = []
-        # for point in src_points:
-        #     # Find the closest fiducial in the image
-        #     min_dist = float('inf')
-        #     closest_fid = None
-        #     for fid_name, fid_pos in fiducial_positions_mm.items():
-        #         # Convert board position to image coordinate system (flip y)
-        #         board_x, board_y = fid_pos
-        #         img_x = board_x + pcb_width/2
-        #         img_y = -(board_y - pcb_height/2)  # Flip y and center
-                
-        #         # Calculate distance to this point
-        #         dist = np.sqrt((point[0] - img_x)**2 + (point[1] - img_y)**2)
-        #         if dist < min_dist:
-        #             min_dist = dist
-        #             closest_fid = fid_name
-        #     fiducial_names.append(closest_fid)
-        
-        # Calculate expected distances between fiducials
-        # if len(fiducial_names) == 4:
-        #     # Map fiducial names to their expected positions
-        #     fid_to_pos = {}
-        #     for fid_name in fiducial_names:
-        #         if fid_name in fiducial_positions_mm:
-        #             x, y = fiducial_positions_mm[fid_name]
-        #             # Convert to coordinate system with origin at center
-        #             fid_to_pos[fid_name] = (x - pcb_width/2, -(y - pcb_height/2))
-            
-        #     # Calculate distances between adjacent fiducials
-        #     if len(fid_to_pos) == 4:
-        #         # Order: top-left, top-right, bottom-right, bottom-left
-        #         expected_width = abs(fid_to_pos[fiducial_names[0]][0] - fid_to_pos[fiducial_names[1]][0])
-        #         expected_height = abs(fid_to_pos[fiducial_names[0]][1] - fid_to_pos[fiducial_names[3]][1])
-                
-        #         # Use expected dimensions if they make sense
-        #         if expected_width > 0 and expected_height > 0:
-        #             output_width = int(expected_width)
-        #             output_height = int(expected_height)
-        #         else:
-        #             output_width = int(fid_width_px)
-        #             output_height = int(fid_height_px)
-        #     else:
-        #         output_width = int(fid_width_px)
-        #         output_height = int(fid_height_px)
-        # else:
     output_width = int(pcb_width * fid_width_px / fid_width_mm)
     output_height = int(pcb_height * fid_height_px / fid_height_mm)
 
@@ -608,30 +546,14 @@ def launch_image_viewer(image_path, master=None, overlay_points=None, packages=N
         # Blend the overlay with the original image at 50% transparency
         cv2.addWeighted(overlay, grid_alpha, img, 1 - grid_alpha, 0, img)
 
-    def toggle_comparison_mode():
-        """Toggle between reference image and comparison mode."""
-        nonlocal comparison_mode, comparison_results
-        
-        comparison_mode.set(not comparison_mode.get())
-        
-        if comparison_mode.get() and "comparison_results" in viewer:
-            # Enable comparison mode
-            comparison_results = viewer["comparison_results"]
-            update_comparison_display()
-        else:
-            # Disable comparison mode - restore reference image
-            if orig_img is not None:
-                curr_img_arr = orig_img.copy()
-                update_display()
-
-    # Pass comparison_mode to viewer - moved to after viewer definition
-
     def update_comparison_display():
         """Update display with comparison results."""
-        nonlocal comparison_results, curr_img_arr
+        nonlocal curr_img_arr
 
         if not comparison_mode.get() or orig_img is None:
             return
+        
+        comparison_results = viewer.get("comparison_results", [])
         
         # Start from original clean image
         display = orig_img.copy()
@@ -979,6 +901,30 @@ def launch_config_viewer(cfg_path, master=None):
     if owns_root:
         window.mainloop()
 
+def process_image_pipeline(image_path, fid_template, board_cfg, fiducial_pos_mm):
+    """Load image, detect fiducials, and apply perspective transform."""
+    img_color = cv2.imread(image_path, 1)
+    if img_color is None:
+        print(f"Failed to load image: {image_path}")
+        return None, None, None, None, None, None
+
+    img_gray = cv2.cvtColor(img_color, cv2.COLOR_RGB2GRAY)
+    
+    # Find fiducials
+    detected_fiducials = find_all_fiducials(img_gray, fid_template)
+    
+    print(f"Detected fiducials in {os.path.basename(image_path)}:")
+    for i, pos in enumerate(detected_fiducials):
+        print(f"  {i+1}: ({pos[0]:.0f}, {pos[1]:.0f})")
+    
+    # Apply transform
+    img_warped, transform, w, h = apply_perspective_transform(
+        img_color, detected_fiducials,
+        pcb_width=board_cfg.get("pcb_width"),
+        pcb_height=board_cfg.get("pcb_height"),
+        fiducial_positions_mm=fiducial_pos_mm
+    )
+    return img_color, img_gray, detected_fiducials, img_warped, transform, w, h
 
 # Main Processing
 
@@ -1044,26 +990,12 @@ def main():
     image_viewer = launch_image_viewer(image_path, master=root, overlay_points=overlay_points)
 
     # Process image
-    img_ref = cv2.imread(image_path, 1)
-    img_gray = cv2.cvtColor(img_ref, cv2.COLOR_RGB2GRAY)
     template = cv2.imread(fiducialTemplate, 0)
-
-    print(f"Image: {img_gray.shape[1]}x{img_gray.shape[0]}")
-
-    # Find fiducials
+    
+    # Use global fiducialPositions for the first image as it's used elsewhere if needed
     global fiducialPositions
-    fiducialPositions = find_all_fiducials(img_gray, template)
-    
-    print("Detected fiducials in image:")
-    for i, pos in enumerate(fiducialPositions):
-        print(f"  {i+1}: ({pos[0]:.0f}, {pos[1]:.0f})")
-    
-    # Apply transform
-    img_warped, transform, warped_w, warped_h = apply_perspective_transform(
-        img_ref, fiducialPositions,
-        pcb_width=board_cfg.get("pcb_width"),
-        pcb_height=board_cfg.get("pcb_height"),
-        fiducial_positions_mm=fiducialBoardPositions
+    img_ref, _, fiducialPositions, img_warped, transform, warped_w, warped_h = process_image_pipeline(
+        image_path, template, board_cfg, fiducialBoardPositions
     )
     img_warped_gray = cv2.cvtColor(img_warped, cv2.COLOR_RGB2GRAY)
     print(f"Warped: {warped_w}x{warped_h}")
@@ -1092,30 +1024,16 @@ def main():
     if second_image_path and os.path.exists(second_image_path):
         print(f"\nProcessing comparison image: {second_image_path}")
         
-        # Load and process second image
-        img_second = cv2.imread(second_image_path, 1)
-        if img_second is not None:
-            img_second_gray = cv2.cvtColor(img_second, cv2.COLOR_RGB2GRAY)
-            
-            # Find fiducials in second image
-            fiducialPositions_second = find_all_fiducials(img_second_gray, template)
-            
-            print("Detected fiducials in second image:")
-            for i, pos in enumerate(fiducialPositions_second):
-                print(f"  {i+1}: ({pos[0]:.0f}, {pos[1]:.0f})")
-            
-            # Apply perspective transform to second image
-            img_second_warped, transform_second, warped_w_second, warped_h_second = apply_perspective_transform(
-                img_second, fiducialPositions_second,
-                pcb_width=board_cfg.get("pcb_width"),
-                pcb_height=board_cfg.get("pcb_height"),
-                fiducial_positions_mm=fiducialBoardPositions
-            )
+        # Use pipeline for second image
+        _, _, _, img_second_warped, transform_second, warped_w_second, warped_h_second = process_image_pipeline(
+            second_image_path, template, board_cfg, fiducialBoardPositions
+        )
+
+        if img_second_warped is not None:
             img_second_warped_gray = cv2.cvtColor(img_second_warped, cv2.COLOR_RGB2GRAY)
-            print(f"Second image warped: {warped_w_second}x{warped_h_second}")
             
             # Compare components
-            if components and fiducialBoardPositions and pcb_w and pcb_h:
+            if components and pcb_w and pcb_h:
                 
                 # Transform component positions for second image
                 M_second = compute_board_to_image_transform(pcb_w, pcb_h, warped_w_second, warped_h_second)
@@ -1127,6 +1045,10 @@ def main():
                 MATCH_THRESHOLD = 0.8  # for TM_CCOEFF_NORMED
                 
                 print(f"Comparing components between images with match threshold {MATCH_THRESHOLD}:")
+
+                debug_dir = "debug_crops"
+                if not os.path.exists(debug_dir):
+                    os.makedirs(debug_dir)
 
                 for i, (ref_pt, comp_pt) in enumerate(zip(overlay_points, overlay_points_second)):
                     if len(ref_pt) >= 5 and len(comp_pt) >= 5:
@@ -1184,9 +1106,6 @@ def main():
                             template = img_warped_gray[ref_y - half_h:ref_y + half_h, ref_x - half_w:ref_x + half_w]
                             
                             # Save debug images
-                            debug_dir = "debug_crops"
-                            if not os.path.exists(debug_dir):
-                                os.makedirs(debug_dir)
                             cv2.imwrite(os.path.join(debug_dir, f"{designator}_ref.png"), template)
                             
                             # Extract corresponding crop from second image for debug
