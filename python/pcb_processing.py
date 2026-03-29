@@ -8,6 +8,60 @@ transformations, and overlays component positions.
 
 import sys
 import os
+
+# Check for required dependencies before proceeding
+def _check_startup_dependencies():
+    pip_missing = []
+    try:
+        import numpy
+    except ImportError:
+        pip_missing.append("numpy")
+    try:
+        import cv2
+    except ImportError:
+        pip_missing.append("opencv-python")
+
+    pil_tk_missing = False
+    try:
+        from PIL import Image, ImageTk
+    except ImportError:
+        try:
+            from PIL import Image
+            pil_tk_missing = True
+        except ImportError:
+            pip_missing.append("pillow")
+    
+    tk_missing = False
+    try:
+        import tkinter
+    except ImportError:
+        tk_missing = True
+
+    if pip_missing or tk_missing or pil_tk_missing:
+        print("\n[!] Error: Missing core dependencies for PCB AOI Inspector")
+        
+        if pip_missing:
+            print(f"The following Python packages are missing: {', '.join(pip_missing)}")
+            print(f"You can install them using: pip install {' '.join(pip_missing)}")
+
+        if pil_tk_missing:
+            print("\nThe 'PIL.ImageTk' module is missing (required for GUI).")
+            if sys.platform.startswith('linux'):
+                print("On Linux, you can install it using: sudo apt install python3-pil.imagetk")
+            else:
+                print("Please ensure Pillow is installed with Tkinter support.")
+            
+        if tk_missing:
+            print("\nThe 'tkinter' module is missing.")
+            if sys.platform.startswith('linux'):
+                print("On Linux, you can install it using: sudo apt install python3-tk")
+            else:
+                print("Please reinstall Python and ensure 'tcl/tk and IDLE' is checked in the installer.")
+                
+        sys.exit(1)
+
+_check_startup_dependencies()
+
 import numpy as np
 import cv2
 
@@ -23,15 +77,9 @@ except ImportError:
     PACKAGE_DIMENSIONS = {}
     print("Warning: Could not import packages_config module")
 
-try:
-    import tkinter as tk
-    from tkinter import ttk
-    from PIL import Image, ImageTk
-except ImportError:
-    tk = None
-    ttk = None
-    Image = None
-    ImageTk = None
+import tkinter as tk
+from tkinter import ttk
+from PIL import Image, ImageTk
 
 
 # Global Variables

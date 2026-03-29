@@ -12,11 +12,13 @@ import os
 import sys
 import json
 
-# Try to import from the existing pcb_processing module
-try:
+# Note: parse_mnt_file import removed from module level to avoid circular 
+# dependency with pcb_processing.py. If needed, import it locally within functions.
+
+def _get_parser():
+    """Helper to get mnt parser without circular imports."""
     from pcb_processing import parse_mnt_file
-except ImportError:
-    parse_mnt_file = None
+    return parse_mnt_file
 
 # Load package dimensions from JSON file
 try:
