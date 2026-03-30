@@ -491,7 +491,7 @@ def launch_image_viewer(image_path, master=None, overlay_points=None, packages=N
                     # Draw center crosshair
                     crosshair_size = 5
                     cv2.line(img_array, (cx-crosshair_size, cy), (cx+crosshair_size, cy), (180, 180, 180), 1)
-                    cv2.line(img_array, (cx, cy-crosshair_size), (cx, cy+crosshair_size), (180, 1080, 180), 1)
+                    cv2.line(img_array, (cx, cy-crosshair_size), (cx, cy+crosshair_size), (180, 180, 180), 1)
                     
                     # Draw component label
                     if label:
@@ -516,6 +516,7 @@ def launch_image_viewer(image_path, master=None, overlay_points=None, packages=N
                         # Determine color based on match value
                         color = (255, 0, 0) # Default Red
                         if label in results_map:
+                            max_val = 0 
                             max_val = results_map[label]
                             if max_val > 0.8:
                                 color = (0, 255, 0) # Green
@@ -523,6 +524,12 @@ def launch_image_viewer(image_path, master=None, overlay_points=None, packages=N
                             else:
                                 color = (255, 0, 0) # Red
                                 cv2.drawContours(img_array, [box], 0, color, 2)
+
+                        else:
+                            # reference mode
+                            color = (200, 200, 200) # light grey
+                            cv2.drawContours(img_array, [box], 0, color, 1)
+            
 
             # Draw grid
             if grid_enabled.get():
