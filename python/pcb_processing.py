@@ -20,16 +20,10 @@ def _check_startup_dependencies():
         import cv2
     except ImportError:
         pip_missing.append("opencv-python")
-
-    pil_tk_missing = False
     try:
-        from PIL import Image, ImageTk
+        from PIL import Image
     except ImportError:
-        try:
-            from PIL import Image
-            pil_tk_missing = True
-        except ImportError:
-            pip_missing.append("pillow")
+        pip_missing.append("pillow")
     
     tk_missing = False
     try:
@@ -37,19 +31,12 @@ def _check_startup_dependencies():
     except ImportError:
         tk_missing = True
 
-    if pip_missing or tk_missing or pil_tk_missing:
+    if pip_missing or tk_missing:
         print("\n[!] Error: Missing core dependencies for PCB AOI Inspector")
         
         if pip_missing:
             print(f"The following Python packages are missing: {', '.join(pip_missing)}")
             print(f"You can install them using: pip install {' '.join(pip_missing)}")
-
-        if pil_tk_missing:
-            print("\nThe 'PIL.ImageTk' module is missing (required for GUI).")
-            if sys.platform.startswith('linux'):
-                print("On Linux, you can install it using: sudo apt install python3-pil.imagetk")
-            else:
-                print("Please ensure Pillow is installed with Tkinter support.")
             
         if tk_missing:
             print("\nThe 'tkinter' module is missing.")
@@ -80,6 +67,7 @@ except ImportError:
 import tkinter as tk
 from tkinter import ttk
 from PIL import Image, ImageTk
+from window_manager import apply_saved_geometry, set_window_geometry
 
 
 # Global Variables
@@ -393,6 +381,9 @@ def launch_image_viewer(image_path, master=None, overlay_points=None, packages=N
     window = master if owns_root else tk.Toplevel(master)
     window.title(f"PCB AOI — {os.path.basename(image_path)}")
 
+    # Apply saved geometry
+    apply_saved_geometry(window, "ImageViewer")
+
     # Handle window close to exit app properly
     def on_window_close():
         if master is not None:
@@ -400,6 +391,9 @@ def launch_image_viewer(image_path, master=None, overlay_points=None, packages=N
         else:
             window.destroy()
     window.protocol("WM_DELETE_WINDOW", on_window_close)
+
+    # Save geometry on destruction
+    window.bind("<Destroy>", lambda e: set_window_geometry(window, "ImageViewer") if e.widget == window else None)
 
     # Load image
     pil_img = load_image(image_path)
@@ -776,6 +770,9 @@ def launch_mnt_viewer(mnt_path, master=None, components=None):
     window = master if owns_root else tk.Toplevel(master)
     window.title(f"Components — {os.path.basename(mnt_path)}")
 
+    # Apply saved geometry
+    apply_saved_geometry(window, "MNTViewer")
+
     frame = ttk.Frame(window, padding=8)
     frame.pack(fill="both", expand=True)
 
@@ -805,6 +802,14 @@ def launch_mnt_viewer(mnt_path, master=None, components=None):
             comp["value"], comp["package"]
         ))
 
+    def handle_closing():
+        window.destroy()
+
+    window.protocol("WM_DELETE_WINDOW", handle_closing)
+
+    # Ensure geometry is saved even if the parent destroys this window
+    window.bind("<Destroy>", lambda e: set_window_geometry(window, "MNTViewer") if e.widget == window else None)
+
     if owns_root:
         window.mainloop()
 
@@ -826,6 +831,9 @@ def launch_comparison_table(comparison_results, master=None):
     window = master if owns_root else tk.Toplevel(master)
     window.title("Comparison Results")
     window.geometry("1000x600")
+
+    # Apply saved geometry
+    apply_saved_geometry(window, "ComparisonTable")
 
     # Control frame
     control_frame = ttk.Frame(window)
@@ -912,6 +920,14 @@ def launch_comparison_table(comparison_results, master=None):
     ttk.Button(control_frame, text="Increase Size (+)", command=lambda: change_size(20)).pack(side="left", padx=5)
     ttk.Button(control_frame, text="Decrease Size (-)", command=lambda: change_size(-20)).pack(side="left", padx=5)
 
+    def handle_closing():
+        window.destroy()
+
+    window.protocol("WM_DELETE_WINDOW", handle_closing)
+
+    # Ensure geometry is saved even if the parent destroys this window
+    window.bind("<Destroy>", lambda e: set_window_geometry(window, "ComparisonTable") if e.widget == window else None)
+
     populate_table()
 
     if owns_root:
@@ -939,12 +955,23 @@ def launch_config_viewer(cfg_path, master=None):
     window = master if owns_root else tk.Toplevel(master)
     window.title(f"PCB Config — {os.path.basename(cfg_path)}")
 
+    # Apply saved geometry
+    apply_saved_geometry(window, "ConfigViewer")
+
     frame = tk.Frame(window, padx=12, pady=12)
     frame.pack(fill="both", expand=True)
 
     tk.Label(frame, text="PCB dimensions", font=(None, 12, "bold")).pack(anchor="w")
     tk.Label(frame, text=f"Width: {width:.2f} mm").pack(anchor="w", pady=(8, 0))
     tk.Label(frame, text=f"Height: {height:.2f} mm").pack(anchor="w")
+
+    def handle_closing():
+        window.destroy()
+
+    window.protocol("WM_DELETE_WINDOW", handle_closing)
+
+    # Ensure geometry is saved even if the parent destroys this window
+    window.bind("<Destroy>", lambda e: set_window_geometry(window, "ConfigViewer") if e.widget == window else None)
 
     if owns_root:
         window.mainloop()

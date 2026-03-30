@@ -11,6 +11,7 @@ from tkinter import ttk
 import os
 import sys
 import json
+from window_manager import apply_saved_geometry, set_window_geometry
 
 # Note: parse_mnt_file import removed from module level to avoid circular 
 # dependency with pcb_processing.py. If needed, import it locally within functions.
@@ -79,6 +80,9 @@ def create_packages_config_gui(master=None, components=None):
     else:
         root = tk.Toplevel(master)
     
+    # Apply saved geometry
+    has_saved_geometry = apply_saved_geometry(root, "PackagesConfig")
+
     root.title("Packages Configuration")
 
     # Main frame
@@ -221,7 +225,8 @@ def create_packages_config_gui(master=None, components=None):
         y = (root.winfo_screenheight() // 2) - (length // 2)
         root.geometry(f'{width}x{length}+{x}+{y}')
 
-    center_window()
+    if not has_saved_geometry:
+        center_window()
 
     # Run the GUI
     def on_resize(event):
@@ -248,10 +253,12 @@ def create_packages_config_gui(master=None, components=None):
 
     # Handle window closing properly
     def handle_closing():
-        save_data(tree, status)
         root.destroy()
 
     root.protocol("WM_DELETE_WINDOW", handle_closing)
+
+    # Ensure geometry is saved even if the parent destroys this window
+    root.bind("<Destroy>", lambda e: set_window_geometry(root, "PackagesConfig") if e.widget == root else None)
     
     # Run mainloop only if we created our own root
     if owns_root:
