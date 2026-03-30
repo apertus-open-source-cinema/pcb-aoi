@@ -421,6 +421,7 @@ def launch_image_viewer(image_path, master=None, overlay_points=None, packages=N
     orig_img = None
     curr_img_arr = None
     curr_pil_img = pil_img
+    highlighted_designator = None # Added for component highlighting
     
     # Comparison mode settings (must be defined before nested functions)
     comparison_mode = tk.BooleanVar(value=False)
@@ -428,6 +429,33 @@ def launch_image_viewer(image_path, master=None, overlay_points=None, packages=N
     
     # Interface dictionary (defined early for closure access)
     viewer = {}
+
+    def set_highlight(designator):
+        nonlocal highlighted_designator
+        highlighted_designator = designator
+        
+        # Auto-center on the selected component
+        target_zoom_scale = 1.0 # As per previous request, zoom to 100%
+        pt = next((p for p in overlay_points if len(p) >= 3 and p[2] == designator), None)
+        if pt:
+            # First, set the new zoom level. This will also trigger update_display.
+            set_zoom(target_zoom_scale)
+
+            # Now, after the image has been resized due to the new zoom,
+            # calculate and apply scroll positions to center the component.
+            scale = zoom_state["scale"] # This will now be target_zoom_scale
+            cx_scaled, cy_scaled = pt[0] * scale, pt[1] * scale
+
+            window.update_idletasks()
+            v_w, v_h = canvas.winfo_width(), canvas.winfo_height()
+            bbox = canvas.bbox(canvas_img)
+            if bbox:
+                t_w, t_h = bbox[2] - bbox[0], bbox[3] - bbox[1]
+                if t_w > 0 and t_h > 0:
+                    # Center the component by setting the scroll position
+                    canvas.xview_moveto(max(0, min(1, (cx_scaled - v_w / 2) / t_w)))
+                    canvas.yview_moveto(max(0, min(1, (cy_scaled - v_h / 2) / t_h)))
+        update_display() # Ensure display is updated after highlight change
 
     def set_image(new_pil):
         nonlocal curr_img_arr, orig_img, curr_pil_img
@@ -514,24 +542,29 @@ def launch_image_viewer(image_path, master=None, overlay_points=None, packages=N
                         box = np.intp(box)
                         
                         # Determine color based on match value
-                        color = (255, 0, 0) # Default Red
                         if label in results_map:
-                            max_val = 0 
                             max_val = results_map[label]
                             if max_val > 0.8:
-                                color = (0, 255, 0) # Green
-                                cv2.drawContours(img_array, [box], 0, color, 1)
+                                current_outline_color = (0, 255, 0) # Green for match
+                                current_outline_thickness = 1
+                                cv2.drawContours(img_array, [box], 0, current_outline_color, current_outline_thickness)      
                             else:
-                                color = (255, 0, 0) # Red
-                                cv2.drawContours(img_array, [box], 0, color, 2)
-
+                                current_outline_color = (255, 0, 0) # Red for mismatch
+                                current_outline_thickness = 2
+                                cv2.drawContours(img_array, [box], 0, current_outline_color, current_outline_thickness)
                         else:
-                            # reference mode
-                            color = (200, 200, 200) # light grey
-                            cv2.drawContours(img_array, [box], 0, color, 1)
+                            # Draw bold highlight if this component is selected in the list
+                            if label == highlighted_designator:
+                                cv2.drawContours(img_array, [box], 0, (255, 0, 255), 4) # Magenta, thicker
+                            else:
+                                # reference mode
+                                color = (200, 200, 200) # light grey
+                                cv2.drawContours(img_array, [box], 0, color, 1)
             
-
             # Draw grid
+                    elif label == highlighted_designator:
+                        # Fallback highlight circle if package dimensions are unknown
+                        cv2.circle(img_array, (cx, cy), int(15 * scale), (255, 0, 255), 3) # Magenta circle
             if grid_enabled.get():
                 if board_transform is not None and board_half_w is not None and board_half_h is not None:
                     draw_grid(img_array)
@@ -752,6 +785,7 @@ def launch_image_viewer(image_path, master=None, overlay_points=None, packages=N
         "set_board_transform": set_board_transform,
         "set_comparison_mode": set_comparison_mode,
         "refresh": update_display,
+        "set_highlight": set_highlight, # Added to viewer interface
         "comparison_mode": comparison_mode,
     })
 
@@ -761,7 +795,7 @@ def launch_image_viewer(image_path, master=None, overlay_points=None, packages=N
     return viewer
 
 
-def launch_mnt_viewer(mnt_path, master=None, components=None):
+def launch_mnt_viewer(mnt_path, master=None, components=None, image_viewer=None): # Added image_viewer parameter
     """Launch component list viewer."""
     if ttk is None:
         return
@@ -786,12 +820,14 @@ def launch_mnt_viewer(mnt_path, master=None, components=None):
     style = ttk.Style(window)
     style.configure("Treeview", rowheight=32)
 
-    columns = ["designator", "x", "y", "rotation", "value", "package"]
+    columns = ["designator", "show", "x", "y", "rotation", "value", "package"]
     tree = ttk.Treeview(frame, columns=columns, show="headings")
 
     for col in columns:
-        tree.heading(col, text=col.capitalize())
-        tree.column(col, width=120, anchor="center")
+        header_text = "Show" if col == "show" else col.capitalize()
+        width = 80 if col == "show" else 120
+        tree.heading(col, text=header_text)
+        tree.column(col, width=width, anchor="center")
 
     vsb = ttk.Scrollbar(frame, orient="vertical", command=tree.yview)
     hsb = ttk.Scrollbar(frame, orient="horizontal", command=tree.xview)
@@ -805,9 +841,29 @@ def launch_mnt_viewer(mnt_path, master=None, components=None):
 
     for comp in components:
         tree.insert("", "end", values=(
-            comp["designator"], comp["x"], comp["y"], comp["rotation"],
+            comp["designator"], "[ 🔍 Show ]", comp["x"], comp["y"], comp["rotation"],
             comp["value"], comp["package"]
         ))
+
+    def on_tree_click(event):
+        """Handle clicking the 'Show' button column."""
+        region = tree.identify_region(event.x, event.y)
+        if region == "cell":
+            column = tree.identify_column(event.x)
+            item = tree.identify_row(event.y)
+            if item and column == "#2": # The 'show' column is second
+                designator = tree.item(item)['values'][0]
+                if image_viewer:
+                    image_viewer["set_highlight"](designator)
+
+    def on_motion(event):
+        """Update cursor to hand when hovering over the Show 'button'."""
+        region = tree.identify_region(event.x, event.y)
+        column = tree.identify_column(event.x)
+        if region == "cell" and column == "#2":
+            tree.configure(cursor="hand2")
+        else:
+            tree.configure(cursor="")
 
     def handle_closing():
         window.destroy()
