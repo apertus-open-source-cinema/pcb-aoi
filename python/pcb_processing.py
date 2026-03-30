@@ -436,7 +436,7 @@ def launch_image_viewer(image_path, master=None, overlay_points=None, packages=N
         
         curr_pil_img = new_pil
         try:
-            arr = np.array(new_pil)
+            arr = np.asarray(new_pil)
             if arr.ndim == 3 and arr.shape[2] == 3:
                 curr_img_arr = cv2.cvtColor(arr, cv2.COLOR_RGB2BGR)
             elif arr.ndim == 3 and arr.shape[2] == 4:
@@ -466,7 +466,7 @@ def launch_image_viewer(image_path, master=None, overlay_points=None, packages=N
             resized = display_img.resize(new_size, Image.LANCZOS)
             
             # Convert to numpy array for OpenCV operations
-            img_array = np.array(resized)
+            img_array = np.asarray(resized)
 
             global pixel_per_mm_scale, pcb_w
             pixel_per_mm_scale = (new_size[0]-1) / pcb_w
