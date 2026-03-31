@@ -910,6 +910,9 @@ def launch_mnt_viewer(mnt_path, master=None, components=None, image_viewer=None)
         else:
             tree.configure(cursor="")
 
+    tree.bind("<Button-1>", on_tree_click)
+    tree.bind("<Motion>", on_motion)
+
     def handle_closing():
         window.destroy()
 
@@ -1135,11 +1138,10 @@ def main():
 
     # Determine base path for companion files
     if image_path.lower().endswith(".mnt"):
-        base = os.path.splitext(os.path.basename(image_path))[0]
+        base = os.path.splitext(image_path)[0]
         mnt_dir = os.path.dirname(image_path) or "."
         # Parse .mnt first
         components = parse_mnt_file(image_path)
-        launch_mnt_viewer(image_path, master=root, components=components)
         
         # Find image
         for ext in (".tif", ".tiff", ".png", ".jpg", ".jpeg"):
@@ -1158,7 +1160,6 @@ def main():
     # Parse .mnt if not already done
     if os.path.exists(mnt_path) and not components:
         components = parse_mnt_file(mnt_path)
-        launch_mnt_viewer(mnt_path, master=root, components=components)
     
     # Parse .cfg
     if os.path.exists(cfg_path):
@@ -1171,6 +1172,10 @@ def main():
 
     # Launch image viewer
     image_viewer = launch_image_viewer(image_path, master=root, overlay_points=overlay_points)
+
+    # Launch component list viewer with image_viewer link
+    if components:
+        launch_mnt_viewer(mnt_path, master=root, components=components, image_viewer=image_viewer)
 
     # Process image
     template = cv2.imread(fiducialTemplate, 0)
