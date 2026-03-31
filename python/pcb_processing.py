@@ -430,6 +430,33 @@ def launch_image_viewer(image_path, master=None, overlay_points=None, packages=N
     # Interface dictionary (defined early for closure access)
     viewer = {}
 
+    status_var = tk.StringVar()
+
+    def update_status_bar(event=None):
+        scale = zoom_state["scale"]
+        txt = f"Zoom: {scale*100:.1f}%"
+        
+        if event and board_transform is not None:
+            # Mouse pos in canvas space (accounts for scrolling)
+            mx = canvas.canvasx(event.x)
+            my = canvas.canvasy(event.y)
+            
+            # Map zoomed pixels back to warped image pixels
+            px, py = mx / scale, my / scale
+            
+            try:
+                # board_transform maps (x, -y) -> (px, py)
+                # Inverse maps (px, py) -> (x, -y)
+                success, M_inv = cv2.invert(board_transform)
+                if success:
+                    pt = np.array([[[px, py]]], dtype=np.float32)
+                    res = cv2.perspectiveTransform(pt, M_inv)
+                    bx, by_neg = res[0][0]
+                    txt += f" | Cursor: X={bx:.2f} mm, Y={-by_neg:.2f} mm"
+            except Exception:
+                pass
+        status_var.set(txt)
+
     def set_highlight(designator):
         nonlocal highlighted_designator
         highlighted_designator = designator
@@ -480,6 +507,7 @@ def launch_image_viewer(image_path, master=None, overlay_points=None, packages=N
         update_display()
 
     def update_display():
+        update_status_bar()
         scale = zoom_state["scale"]
         img = curr_img_arr.copy() if curr_img_arr is not None else None
         display_img = to_pil(img)
@@ -730,6 +758,10 @@ def launch_image_viewer(image_path, master=None, overlay_points=None, packages=N
     zoom_slider.set(scale)
     zoom_slider.pack(side="right", padx=4)
 
+    # Status bar
+    status_bar = tk.Label(window, textvariable=status_var, bd=1, relief=tk.SUNKEN, anchor="w", padx=5)
+    status_bar.pack(side="bottom", fill="x")
+
     # Canvas
     container = tk.Frame(window)
     container.pack(fill="both", expand=True)
@@ -748,6 +780,7 @@ def launch_image_viewer(image_path, master=None, overlay_points=None, packages=N
     # Mouse handling
     canvas.bind("<ButtonPress-1>", lambda e: canvas.scan_mark(e.x, e.y))
     canvas.bind("<B1-Motion>", lambda e: canvas.scan_dragto(e.x, e.y, gain=1))
+    canvas.bind("<Motion>", update_status_bar)
     
     def on_mousewheel(event):
         factor = 1.2 if (event.delta > 0 or event.num == 4) else 1/1.2

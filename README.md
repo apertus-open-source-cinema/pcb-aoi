@@ -9,7 +9,7 @@ The **PCB AOI (Automated Optical Inspection) Inspector** is a software tool desi
 - **Component Overlay**: Visualizes component designators and package outlines based on `.mnt` pick-and-place files.
 - **Defect Detection**: Compares a "Reference" image against a "Target" image to identify missing, skewed, or incorrect components.
 - **Package Configuration**: Dedicated GUI to manage physical dimensions of various component packages for accurate rendering.
-- **Interactive Viewer**: Zoomable inspection window with toggleable overlays, grids, and comparison results.
+- **Interactive Viewer**: Zoomable inspection window with toggleable overlays, grids, comparison results, and a real-time status bar showing cursor coordinates in board millimeters.
 
 ## Installation
 
