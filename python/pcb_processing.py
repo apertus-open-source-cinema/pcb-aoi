@@ -737,6 +737,16 @@ def launch_image_viewer(image_path, master=None, overlay_points=None, packages=N
         
         update_display()
 
+    def zoom_fit():
+        """Adjust zoom to fit the image within the current canvas area."""
+        if curr_pil_img is None:
+            return
+        window.update_idletasks()
+        v_w, v_h = canvas.winfo_width(), canvas.winfo_height()
+        if v_w > 1 and v_h > 1:
+            img_w, img_h = curr_pil_img.size
+            set_zoom(min(v_w / img_w, v_h / img_h))
+
     # Create UI
     control_frame = tk.Frame(window)
     control_frame.pack(fill="x", padx=4, pady=4)
@@ -752,6 +762,8 @@ def launch_image_viewer(image_path, master=None, overlay_points=None, packages=N
               command=lambda: set_zoom(zoom_state["scale"] * 1.2)).pack(side="right")
     tk.Button(control_frame, text="Zoom -",
               command=lambda: set_zoom(zoom_state["scale"] / 1.2)).pack(side="right")
+    tk.Button(control_frame, text="Zoom fit",
+              command=zoom_fit).pack(side="right", padx=4)
 
     zoom_slider = tk.Scale(control_frame, from_=0.1, to=10.0, orient="horizontal",
                            resolution=0.05, command=set_zoom, length=200)
