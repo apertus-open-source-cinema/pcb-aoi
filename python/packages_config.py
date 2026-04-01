@@ -50,10 +50,12 @@ def save_data(tree, status):
         # Handle empty strings by converting to 0.0
         width_str = values[2] if values[2] else '0.0'
         length_str = values[3] if values[3] else '0.0'
-        package_data[values[0]] = {
-            "width_mm": float(width_str),
-            "length_mm": float(length_str)
-        }
+        w, l = float(width_str), float(length_str)
+        if w > 0 and l > 0:
+            package_data[values[0]] = {
+                "width_mm": w,
+                "length_mm": l
+            }
     import json
     with open("packages_config.json", "w") as f:
         json.dump(package_data, f, indent=2)
@@ -163,19 +165,23 @@ def create_packages_config_gui(master=None, components=None, on_change=None):
         def save_edit(event=None):
             try:
                 val = float(entry.get())
+                if val <= 0:
+                    raise ValueError("Dimensions must be positive")
+
                 new_values = list(tree.item(item, "values"))
                 new_values[col_idx] = str(val)
                 tree.item(item, values=new_values)
 
-                # Update global dictionary immediately so other modules see changes
+                # Update global dictionary immediately if both dimensions are valid
                 pkg_name = new_values[0]
-                PACKAGE_DIMENSIONS[pkg_name] = (float(new_values[2]), float(new_values[3]))
+                w, l = float(new_values[2]), float(new_values[3])
+                if w > 0 and l > 0:
+                    PACKAGE_DIMENSIONS[pkg_name] = (w, l)
+                    # Notify listener that data has changed
+                    if on_change:
+                        on_change()
 
                 entry.destroy()
-
-                # Notify listener that data has changed
-                if on_change:
-                    on_change()
             except ValueError:
                 entry.configure(bg="#ffcccc")
 
