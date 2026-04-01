@@ -64,11 +64,12 @@ def on_closing(tree, status):
     save_data(tree, status)
     tree.master.destroy()
 
-def create_packages_config_gui(master=None, components=None):
+def create_packages_config_gui(master=None, components=None, on_change=None):
     """Create the main GUI window.
     
     Args:
         master: Optional parent Tk window. If None, creates a new Toplevel window.
+        on_change: Optional callback function called when dimensions are modified.
     
     Returns:
         Dictionary with 'root' reference for cleanup if needed.
@@ -165,7 +166,16 @@ def create_packages_config_gui(master=None, components=None):
                 new_values = list(tree.item(item, "values"))
                 new_values[col_idx] = str(val)
                 tree.item(item, values=new_values)
+
+                # Update global dictionary immediately so other modules see changes
+                pkg_name = new_values[0]
+                PACKAGE_DIMENSIONS[pkg_name] = (float(new_values[2]), float(new_values[3]))
+
                 entry.destroy()
+
+                # Notify listener that data has changed
+                if on_change:
+                    on_change()
             except ValueError:
                 entry.configure(bg="#ffcccc")
 
