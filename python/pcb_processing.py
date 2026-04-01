@@ -266,6 +266,36 @@ def parse_mnt_file(path):
     return components
 
 
+def parse_pcb_pads_file(path):
+    """Parse pad location file.
+
+    Returns:
+        List of pad dicts with keys: component, pin, x, y
+    """
+    pads = []
+    if not os.path.exists(path):
+        return pads
+
+    with open(path, "r", encoding="utf-8", errors="ignore") as f:
+        for line in f:
+            line = line.strip()
+            if not line or line.startswith("#"):
+                continue
+
+            parts = line.split(",")
+            if len(parts) < 4:
+                continue
+
+            try:
+                component = parts[0].strip()
+                pin = int(parts[1].strip())
+                x = float(parts[2].strip())
+                y = float(parts[3].strip())
+                pads.append({"component": component, "pin": pin, "x": x, "y": y})
+            except ValueError:
+                continue
+    return pads
+
 def parse_pcb_config(path):
     """Parse PCB configuration file."""
     cfg = {}
@@ -346,6 +376,30 @@ def transform_component_positions(components, transform_matrix, img_width, img_h
     return overlay_points
 
 
+def transform_pad_positions(pads, transform_matrix, img_width, img_height):
+    """Transform pad positions from board coords to image pixels."""
+    transformed_pads = []
+    half_w = img_width / 2.0
+    half_h = img_height / 2.0
+
+    for pad in pads:
+        component = pad.get("component", "")
+        pin = pad.get("pin", 0)
+        x, y = pad.get("x"), pad.get("y")
+        if x is None or y is None:
+            continue
+
+        # Convert board coords to image coords (flip y)
+        pt = np.array([[[x, -y]]], dtype=np.float32)
+
+        mapped = cv2.perspectiveTransform(pt, transform_matrix)
+        px = float(mapped[0, 0, 0])
+        py = float(mapped[0, 0, 1])
+
+        transformed_pads.append((px, py, component, pin))
+
+    return transformed_pads
+
 # GUI Functions
 
 def to_pil(img):
@@ -358,7 +412,7 @@ def to_pil(img):
     return Image.fromarray(rgb)
 
 
-def launch_image_viewer(image_path, master=None, overlay_points=None, packages=None):
+def launch_image_viewer(image_path, master=None, overlay_points=None, pad_locations=None):
     """Launch Tkinter image viewer with zoom and overlay support."""
     if tk is None or Image is None or ImageTk is None:
         print("Tkinter/Pillow not available")
@@ -411,6 +465,7 @@ def launch_image_viewer(image_path, master=None, overlay_points=None, packages=N
     # Overlay and grid settings
     overlay_enabled = tk.BooleanVar(value=True)
     grid_enabled = tk.BooleanVar(value=False)
+    pads_enabled = tk.BooleanVar(value=False) # New: Display Pads checkbox
     overlay_points = overlay_points if overlay_points is not None else []
     overlay_map = {pt[2]: pt for pt in overlay_points if len(pt) >= 3}
     
@@ -420,6 +475,7 @@ def launch_image_viewer(image_path, master=None, overlay_points=None, packages=N
     
     orig_img = None
     curr_img_arr = None
+    pads_data = pad_locations if pad_locations is not None else [] # Store transformed pad locations
     curr_pil_img = pil_img
     highlighted_designator = None # Added for component highlighting
     
@@ -600,6 +656,14 @@ def launch_image_viewer(image_path, master=None, overlay_points=None, packages=N
                     cv2.putText(img_array, "Grid: missing transform", (10, 25),
                                 cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 0, 255), 2)
 
+            # Draw pads
+            if pads_enabled.get() and pads_data:
+                for px, py, comp, pin in pads_data:
+                    cx, cy = int(px * scale), int(py * scale)
+                    # Draw a small circle for each pad
+                    cv2.circle(img_array, (cx, cy), 3, (255, 255, 0), -1) # Yellow circle, filled
+                    #cv2.putText(img_array, f"{comp}.{pin}", (cx + 5, cy - 5), cv2.FONT_HERSHEY_SIMPLEX, 0.3, (0, 255, 255), 1)
+
             # Convert back to PIL and then to PhotoImage
             resized_pil = Image.fromarray(img_array)
             tk_img = ImageTk.PhotoImage(resized_pil)
@@ -755,6 +819,8 @@ def launch_image_viewer(image_path, master=None, overlay_points=None, packages=N
     
     tk.Checkbutton(control_frame, text="Overlay", variable=overlay_enabled,
                    command=update_display).pack(side="right", padx=4)
+    tk.Checkbutton(control_frame, text="Display Pads", variable=pads_enabled,
+                   command=update_display).pack(side="right", padx=4) # New checkbox
     tk.Checkbutton(control_frame, text="10mm Grid", variable=grid_enabled,
                    command=update_display).pack(side="right", padx=4)
     
@@ -825,12 +891,18 @@ def launch_image_viewer(image_path, master=None, overlay_points=None, packages=N
                 curr_img_arr = orig_img.copy()
                 update_display()
 
+    def set_pad_locations(new_pads):
+        nonlocal pads_data
+        pads_data = new_pads
+        update_display()
+
     viewer.update({
         "set_image": set_image,
         "set_board_transform": set_board_transform,
         "set_comparison_mode": set_comparison_mode,
         "refresh": update_display,
         "set_highlight": set_highlight, # Added to viewer interface
+        "set_pad_locations": set_pad_locations, # New: Set pad locations
         "comparison_mode": comparison_mode,
     })
 
@@ -1133,6 +1205,8 @@ def main():
     overlay_points = []
     image_viewer = None
     components = []
+    pad_locations = [] # New: Store raw pad locations
+    transformed_pad_locations = [] # New: Store transformed pad locations
     base = ""
     board_cfg = {}
 
@@ -1152,6 +1226,12 @@ def main():
     else:
         base = os.path.splitext(image_path)[0]
 
+    # Load pad locations if .csv exists
+    pads_path = base + ".csv"
+    if os.path.exists(pads_path):
+        pad_locations = parse_pcb_pads_file(pads_path)
+        print(f"Found {len(pad_locations)} pads in {pads_path}")
+
 
     # Load companion files
     mnt_path = base + ".mnt"
@@ -1167,7 +1247,7 @@ def main():
         launch_config_viewer(cfg_path, master=root)
 
     # Launch image viewer
-    image_viewer = launch_image_viewer(image_path, master=root, overlay_points=overlay_points)
+    image_viewer = launch_image_viewer(image_path, master=root, overlay_points=overlay_points, pad_locations=[]) # Pass empty list initially
 
     # Launch packages config viewer with a refresh callback for the image viewer
     if create_packages_config_gui is not None:
@@ -1207,9 +1287,14 @@ def main():
         overlay_points.extend(transform_component_positions(components, M, warped_w, warped_h))
         print(f"Generated {len(overlay_points)} overlay points")
 
+        if pad_locations: # If raw pad data was loaded
+            transformed_pad_locations = transform_pad_positions(pad_locations, M, warped_w, warped_h)
+            print(f"Generated {len(transformed_pad_locations)} transformed pad locations")
+
         # Setup viewer transform
         if image_viewer:
             image_viewer["set_board_transform"](M, half_w, half_h)
+            image_viewer["set_pad_locations"](transformed_pad_locations) # Update pad locations in viewer
 
     # Process second image for comparison if provided
     if second_image_path and os.path.exists(second_image_path):
