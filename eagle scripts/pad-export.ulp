@@ -1,5 +1,5 @@
-#usage "<b>Export Pad Coordinates to CSV</b>\n"
-       "<p>This ULP exports the X and Y coordinates (in mm) along with the "
+#usage "<b>Export Pad Coordinates to Top/Bottom CSVs</b>\n"
+       "<p>This ULP exports the X and Y coordinates (in mm) for top and bottom "
        "component designator and pad name for all pads/SMDs on the board.</p>"
        "<author>Author: Gemini</author>"
 
@@ -16,27 +16,45 @@ board(B) {
     outputFileName = filesetext(B.name, "_pads.csv");
 
     // Prompt the user to choose a save location
-    outputFileName = dlgFileSave("Save Pad Coordinates", outputFileName, "CSV Files (*.csv)");
+    outputFileName = dlgFileSave("Save Pad Coordinates (Base Name)", outputFileName, "CSV Files (*.csv)");
 
     if (outputFileName != "") {
-        output(outputFileName) {
-            // Write the CSV header
-            printf("Designator,Pad,X (mm),Y (mm)\n");
+        string base = filesetext(outputFileName, "");
+        string topPath = base + "_top.csv";
+        string botPath = base + "_bot.csv";
 
-            // Loop through all elements (components) on the board
+        // Export Top Side
+        output(topPath) {
+            printf("Designator,Pad,X (mm),Y (mm)\n");
             B.elements(E) {
-                // A package must exist for the element to have pads
                 if (E.package) {
-                    // Loop through all contacts (both through-hole pads and SMDs)
                     E.package.contacts(C) {
-                        // Print: Element Name (e.g., R1), Pad Name (e.g., 1), X coord, Y coord
-                        printf("%s,%s,%.4f,%.4f\n", E.name, C.name, u2mm(C.x), u2mm(C.y));
+                        // Layer 1 is Top. C.pad is true for through-hole.
+                        if (C.pad || (C.smd && C.layer == 1)) {
+                            printf("%s,%s,%.4f,%.4f\n", E.name, C.name, u2mm(C.x), u2mm(C.y));
+                        }
                     }
                 }
             }
         }
+
+        // Export Bottom Side
+        output(botPath) {
+            printf("Designator,Pad,X (mm),Y (mm)\n");
+            B.elements(E) {
+                if (E.package) {
+                    E.package.contacts(C) {
+                        // Layer 16 is Bottom. C.pad is true for through-hole.
+                        if (C.pad || (C.smd && C.layer == 16)) {
+                            printf("%s,%s,%.4f,%.4f\n", E.name, C.name, u2mm(C.x), u2mm(C.y));
+                        }
+                    }
+                }
+            }
+        }
+
         // Notify the user of success
-        dlgMessageBox("Export completed successfully!\n\nFile saved to:\n" + outputFileName);
+        dlgMessageBox("Export completed successfully!\n\nFiles saved:\n" + topPath + "\n" + botPath);
     } else {
         // User cancelled the file dialog
         exit(0);
