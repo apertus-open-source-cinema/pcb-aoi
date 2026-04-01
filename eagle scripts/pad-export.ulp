@@ -1,0 +1,44 @@
+#usage "<b>Export Pad Coordinates to CSV</b>\n"
+       "<p>This ULP exports the X and Y coordinates (in mm) along with the "
+       "component designator and pad name for all pads/SMDs on the board.</p>"
+       "<author>Author: Gemini</author>"
+
+string outputFileName;
+
+// Ensure the script is being run from the Board Editor
+if (!board) {
+    dlgMessageBox("!Error: Please run this ULP from the PCB Board Editor.");
+    exit(1);
+}
+
+board(B) {
+    // Generate a default output filename based on the current board name
+    outputFileName = filesetext(B.name, "_pads.csv");
+
+    // Prompt the user to choose a save location
+    outputFileName = dlgFileSave("Save Pad Coordinates", outputFileName, "CSV Files (*.csv)");
+
+    if (outputFileName != "") {
+        output(outputFileName) {
+            // Write the CSV header
+            printf("Designator,Pad,X (mm),Y (mm)\n");
+
+            // Loop through all elements (components) on the board
+            B.elements(E) {
+                // A package must exist for the element to have pads
+                if (E.package) {
+                    // Loop through all contacts (both through-hole pads and SMDs)
+                    E.package.contacts(C) {
+                        // Print: Element Name (e.g., R1), Pad Name (e.g., 1), X coord, Y coord
+                        printf("%s,%s,%.4f,%.4f\n", E.name, C.name, u2mm(C.x), u2mm(C.y));
+                    }
+                }
+            }
+        }
+        // Notify the user of success
+        dlgMessageBox("Export completed successfully!\n\nFile saved to:\n" + outputFileName);
+    } else {
+        // User cancelled the file dialog
+        exit(0);
+    }
+}
