@@ -1166,12 +1166,15 @@ def main():
         board_cfg = parse_pcb_config(cfg_path)
         launch_config_viewer(cfg_path, master=root)
 
-    # Launch packages config viewer
-    if create_packages_config_gui is not None:
-        create_packages_config_gui(master=root, components=components)
-
     # Launch image viewer
     image_viewer = launch_image_viewer(image_path, master=root, overlay_points=overlay_points)
+
+    # Launch packages config viewer with a refresh callback for the image viewer
+    if create_packages_config_gui is not None:
+        def on_pkg_change():
+            if image_viewer:
+                image_viewer["refresh"]()
+        create_packages_config_gui(master=root, components=components, on_change=on_pkg_change)
 
     # Launch component list viewer with image_viewer link
     if components:
