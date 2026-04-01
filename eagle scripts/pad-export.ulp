@@ -27,12 +27,10 @@ board(B) {
         output(topPath) {
             printf("Designator,Pad,X (mm),Y (mm)\n");
             B.elements(E) {
-                if (E.package) {
-                    E.package.contacts(C) {
-                        // Layer 1 is Top. C.pad is true for through-hole.
-                        if (C.pad || (C.smd && C.layer == 1)) {
-                            printf("%s,%s,%.4f,%.4f\n", E.name, C.name, u2mm(C.x), u2mm(C.y));
-                        }
+                E.package.contacts(C) {
+                    // Layer 1 is Top. C.pad is true for through-hole.
+                    if (C.pad || (C.smd && C.smd.layer == 1)) {
+                        printf("%s,%s,%.4f,%.4f\n", E.name, C.name, u2mm(C.x), u2mm(C.y));
                     }
                 }
             }
@@ -42,12 +40,10 @@ board(B) {
         output(botPath) {
             printf("Designator,Pad,X (mm),Y (mm)\n");
             B.elements(E) {
-                if (E.package) {
-                    E.package.contacts(C) {
-                        // Layer 16 is Bottom. C.pad is true for through-hole.
-                        if (C.pad || (C.smd && C.layer == 16)) {
-                            printf("%s,%s,%.4f,%.4f\n", E.name, C.name, u2mm(C.x), u2mm(C.y));
-                        }
+                E.package.contacts(C) {
+                    // Layer 16 is Bottom. C.pad is true for through-hole.
+                    if (C.pad || (C.smd && C.smd.layer == 16)) {
+                        printf("%s,%s,%.4f,%.4f\n", E.name, C.name, u2mm(C.x), u2mm(C.y));
                     }
                 }
             }
